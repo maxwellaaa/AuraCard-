@@ -6,6 +6,8 @@ import type {
   BgTab,
   ChatMessage,
   AiProviderId,
+  CardSection,
+  ExportResolutionId,
 } from "./types";
 
 export const selectedTemplateId = ref<TemplateId>("A");
@@ -35,11 +37,20 @@ export const textColor = ref(selectedTemplate.value.defaultText);
 export const textAlignment = ref<"left" | "center" | "right" | "justify">(
   "left",
 );
+/** 正文单独对齐（与标题对齐独立） */
+export const contentTextAlignment = ref<"left" | "center" | "right">("left");
+/** 正文基础字号（px），影响预览与自动分页测量 */
+export const contentFontSizePx = ref(18);
 export const accent = ref(selectedTemplate.value.defaultAccent);
 export const radius = ref(selectedTemplate.value.defaultRadius);
 export const padding = ref(selectedTemplate.value.defaultPadding);
 
 export const splitContents = ref<string[]>([""]);
+/** 按标题分段模式：每张卡片独立标题/正文，编辑不触发高度重切页 */
+export const sectionMode = ref(false);
+export const cardSections = ref<CardSection[]>([]);
+/** 当前选中的卡片下标（用于单独改文字样式） */
+export const activeCardIndex = ref(0);
 export const isAiChatCollapsed = ref(false);
 
 export const bgTab = ref<BgTab>("solid");
@@ -57,6 +68,7 @@ export const cardRefs = ref<HTMLElement[]>([]);
 export const previewFrameRef = ref<HTMLElement | null>(null);
 export const previewSize = ref({ width: 0, height: 0 });
 export const isDownloading = ref(false);
+export const exportResolutionId = ref<ExportResolutionId>("hd");
 export const errorMessage = ref<string | null>(null);
 export const isSettingsCollapsed = ref(false);
 

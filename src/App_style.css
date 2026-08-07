@@ -976,7 +976,7 @@
   border-bottom-left-radius: var(--radius-xs);
   box-shadow: 0 4px 15px rgba(0,0,0,0.03);
 }
-.bubble__actions { margin-top: var(--space-sm); display: flex; }
+.bubble__actions { margin-top: var(--space-sm); display: flex; gap: 8px; flex-wrap: wrap; }
 
 /* ---- Chat Composer ---- */
 .chatComposer {

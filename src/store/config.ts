@@ -1,4 +1,9 @@
-import type { TemplateConfig, AspectPreset, AiProviderOption } from "./types";
+import type {
+  TemplateConfig,
+  AspectPreset,
+  AiProviderOption,
+  ExportResolutionPreset,
+} from "./types";
 
 export const templates: TemplateConfig[] = [
   { id: "A", name: "极简", defaultBackground: "#ffffff", defaultText: "#111827", defaultAccent: "#2563eb", defaultRadius: 16, defaultPadding: 36, alignment: "left", border: true, shadow: false, backgroundMode: "solid" },
@@ -23,6 +28,40 @@ export const aspectPresets: AspectPreset[] = [
   { id: "1:1", label: "1:1", w: 1, h: 1 },
   { id: "5:7", label: "5:7", w: 5, h: 7 },
   { id: "9:16", label: "9:16", w: 9, h: 16 },
+];
+
+/** 社交媒体常用导出宽度（短边），按当前卡片比例换算高度 */
+export const exportResolutionPresets: ExportResolutionPreset[] = [
+  {
+    id: "x2",
+    label: "预览 2×",
+    hint: "快速导出",
+    pixelRatio: 2,
+  },
+  {
+    id: "hd",
+    label: "标准高清",
+    hint: "小红书/IG 常用",
+    targetWidth: 1080,
+  },
+  {
+    id: "hq",
+    label: "高清+",
+    hint: "精修发帖",
+    targetWidth: 1440,
+  },
+  {
+    id: "2k",
+    label: "超清 2K",
+    hint: "细节更锐",
+    targetWidth: 1620,
+  },
+  {
+    id: "4k",
+    label: "极清 4K",
+    hint: "最高画质",
+    targetWidth: 2160,
+  },
 ];
 
 export const colorSwatches = [

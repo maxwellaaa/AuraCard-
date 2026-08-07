@@ -3,8 +3,10 @@ import {
   chatInput,
   isChatLoading,
   chatError,
+  aiApiKey,
   aiBaseUrl,
   aiModel,
+  aiProvider,
   customAiBaseUrl,
   isTestingAiConnection,
   aiTestMessage,
@@ -16,10 +18,11 @@ import {
   content,
   watermark,
 } from "./state";
-import { request } from "../request";
-import { normalizeBaseUrl, newId } from "./utils";
+import { request, RequestError } from "../request";
+import { chatEndpoint, normalizeBaseUrl, newId } from "./utils";
 import type { ChatMessage, AiProviderId } from "./types";
 import { aiProviderOptions } from "./config";
+import { applyTitleSegmentedCards } from "./sections";
 
 const IMAGE_TERMINAL_FAILURE_STATUS = new Set([
   "FAILED",
@@ -195,32 +198,124 @@ export function setAiTestFeedback(
   aiTestMessage.value = message;
 }
 
+/** 开发环境经 Vite 代理，避免浏览器直连官方 API 的 CORS 限制 */
+function resolveBrowserChatBaseUrl() {
+  const provider = aiProvider.value;
+  if (provider === "deepseek") return "/deepseek-proxy";
+  if (provider === "openai") return "/openai-proxy";
+  if (provider === "openrouter") return "/openrouter-proxy";
+  if (provider === "qwen") return "/dashscope-proxy/compatible-mode/v1";
+  if (provider === "custom") {
+    return normalizeBaseUrl(customAiBaseUrl.value || aiBaseUrl.value);
+  }
+  return normalizeBaseUrl(aiBaseUrl.value || selectedAiProvider.value.baseUrl);
+}
+
+async function callOpenAiCompatibleChat(
+  messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
+  apiKey: string,
+) {
+  const model =
+    (!isImageGenerationModel() && aiModel.value.trim()
+      ? aiModel.value.trim()
+      : "") ||
+    selectedAiProvider.value.models.find((m) => m.kind !== "image")?.value ||
+    "deepseek-chat";
+
+  const endpoint = chatEndpoint(resolveBrowserChatBaseUrl());
+  if (!endpoint) {
+    throw new Error("请先配置有效的 API 地址。");
+  }
+
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), 60000);
+
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: 0.7,
+      }),
+      signal: controller.signal,
+    });
+
+    const payload = (await response.json().catch(() => null)) as {
+      error?: { message?: string };
+      message?: string;
+      choices?: Array<{ message?: { content?: string } }>;
+    } | null;
+
+    if (!response.ok) {
+      const detail =
+        payload?.error?.message ||
+        payload?.message ||
+        `请求失败（${response.status}）`;
+      throw new RequestError(detail, { status: response.status });
+    }
+
+    const text = payload?.choices?.[0]?.message?.content?.trim() || "";
+    if (!text) throw new Error("AI 返回为空。");
+    return text;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("请求超时，请稍后重试。");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 export async function callAiChat(
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
 ) {
+  const apiKey = aiApiKey.value.trim();
+  if (apiKey) {
+    return callOpenAiCompatibleChat(messages, apiKey);
+  }
+
   const model =
     !isImageGenerationModel() && aiModel.value.trim()
       ? aiModel.value.trim()
       : undefined;
 
-  const data = await request<{
-    content?: Record<string, unknown> | string | null;
-  }>("/ai/chat", {
-    method: "POST",
-    data: {
-      model,
-      messages,
-    },
-    timeoutMs: 60000,
-  });
+  try {
+    const data = await request<{
+      content?: Record<string, unknown> | string | null;
+    }>("/ai/chat", {
+      method: "POST",
+      data: {
+        model,
+        messages,
+      },
+      timeoutMs: 60000,
+    });
 
-  const content =
-    typeof data?.content === "string"
-      ? data.content
-      : JSON.stringify(data?.content ?? "");
-  if (typeof content !== "string" || !content.trim())
-    throw new Error("AI 返回为空。");
-  return content.trim();
+    const content =
+      typeof data?.content === "string"
+        ? data.content
+        : JSON.stringify(data?.content ?? "");
+    if (typeof content !== "string" || !content.trim())
+      throw new Error("AI 返回为空。");
+    return content.trim();
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      /网络连接失败|Failed to fetch|ECONNREFUSED|请求失败（5\d\d）/.test(
+        error.message,
+      )
+    ) {
+      throw new Error("后端未启动且未填写 API Key。请在设置中填入 DeepSeek Key。");
+    }
+    throw error;
+  }
 }
 
 export async function sendChat() {
@@ -319,6 +414,8 @@ export async function aiSummarizeMessage(rawContent: string) {
   isChatLoading.value = true;
   chatError.value = null;
   try {
+    const { clearSectionMode } = await import("./sections");
+    clearSectionMode();
     const summary = await callAiChat([
       {
         role: "system",
@@ -348,6 +445,23 @@ export async function aiSummarizeLastAssistant() {
     .find((m) => m.role === "assistant");
   if (!last) return;
   await aiSummarizeMessage(last.content);
+}
+
+export function buildCardsFromChatMessage(rawContent: string) {
+  const source = rawContent.trim();
+  if (!source) return;
+  chatError.value = null;
+  try {
+    applyTitleSegmentedCards(source);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "分段失败";
+    setChatError(msg);
+  }
+}
+
+/** 直接按原文排版成卡片（不过 AI 重写），保留标题/正文结构解析 */
+export function layoutContentAsCards(rawContent: string) {
+  buildCardsFromChatMessage(rawContent);
 }
 
 export function clearChat() {

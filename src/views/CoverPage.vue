@@ -22,6 +22,29 @@ const coverAuthor = ref('— 光语 —')
 const isCoverDownloading = ref(false)
 const coverError = ref('')
 const coverCanvasRef = ref<HTMLElement | null>(null)
+const importedCoverImageUrl = ref<string | null>(null)
+const coverImageInputRef = ref<HTMLInputElement | null>(null)
+const coverImageOpacity = ref(100)
+
+const onPickCoverImage = (e: Event) => {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file || !file.type.startsWith('image/')) return
+  const reader = new FileReader()
+  reader.onload = () => {
+    importedCoverImageUrl.value = String(reader.result || '')
+    selectedCoverTemplateId.value = 'import'
+  }
+  reader.readAsDataURL(file)
+  input.value = ''
+}
+
+const clearImportedCoverImage = () => {
+  importedCoverImageUrl.value = null
+  if (selectedCoverTemplateId.value === 'import') {
+    selectedCoverTemplateId.value = coverTemplates[0]?.id || 'mint'
+  }
+}
 
 const handleTextUpdate = (e: Event) => {
   const target = e.target as HTMLElement
@@ -147,6 +170,20 @@ const buildAiCoverPrompt = (userIdea: string) => {
 }
 
 const selectedCoverTemplate = computed(() => {
+  if (selectedCoverTemplateId.value === 'import' && importedCoverImageUrl.value) {
+    const op = Math.max(0, Math.min(100, coverImageOpacity.value)) / 100
+    return {
+      id: 'import',
+      name: '导入图片',
+      background: `linear-gradient(to bottom, rgba(0,0,0,${0.08 * op}) 0%, rgba(0,0,0,${0.45 * op}) 100%), url(${importedCoverImageUrl.value}) center/cover no-repeat`,
+      color: '#ffffff',
+      quoteColor: 'rgba(255,255,255,0.75)',
+      accent: '#f43f5e',
+      iconViewBox: '0 -960 960 960',
+      iconPaths: ['M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm40-80h480L560-480 440-320 340-440 240-280Zm-40 80v-560 560Z'],
+      fontFamily: "'Noto Serif SC', serif",
+    }
+  }
   if (selectedCoverTemplateId.value === 'ai') {
     return {
       id: 'ai',
@@ -293,6 +330,23 @@ const downloadCover = async () => {
             <strong>{{ template.name }}</strong>
           </button>
           
+          <!-- 导入图片排版 -->
+          <button
+            class="coverTemplateCard"
+            :class="{ 'coverTemplateCard--active': selectedCoverTemplateId === 'import' }"
+            @click="importedCoverImageUrl ? selectedCoverTemplateId = 'import' : coverImageInputRef?.click()"
+          >
+            <div
+              class="coverTemplateCard__thumb"
+              :style="importedCoverImageUrl
+                ? { background: `url(${importedCoverImageUrl}) center/cover no-repeat`, color: '#fff', border: 'none' }
+                : { background: 'linear-gradient(145deg, #f8fafc, #e2e8f0)', color: '#475569' }"
+            >
+              <span>{{ importedCoverImageUrl ? '你好' : '导入图片' }}</span>
+            </div>
+            <strong>导入排版</strong>
+          </button>
+
           <!-- AI创作入口 -->
           <button
             class="coverTemplateCard"
@@ -305,6 +359,26 @@ const downloadCover = async () => {
             </div>
             <strong style="color: var(--primary);">AI创作</strong>
           </button>
+        </div>
+        <input
+          ref="coverImageInputRef"
+          type="file"
+          accept="image/*"
+          style="display: none;"
+          @change="onPickCoverImage"
+        />
+        <div v-if="selectedCoverTemplateId === 'import'" style="margin-top: 12px; display: grid; gap: 8px;">
+          <button class="btn btn--outline" type="button" style="width: 100%; justify-content: center;" @click="coverImageInputRef?.click()">
+            {{ importedCoverImageUrl ? '更换图片' : '选择图片' }}
+          </button>
+          <div v-if="importedCoverImageUrl">
+            <div class="fontSizeRow__label" style="font-size: 12px; color: #64748b;">暗角强度 {{ coverImageOpacity }}%</div>
+            <input class="range" type="range" min="0" max="100" v-model.number="coverImageOpacity" />
+            <button class="btn btn--outline btn--sm" type="button" style="margin-top: 6px;" @click="clearImportedCoverImage">清除图片</button>
+          </div>
+          <p style="font-size: 12px; color: #64748b; line-height: 1.5; margin: 0;">
+            导入本地图片作封面底图，再直接编辑标题与署名文字完成排版。
+          </p>
         </div>
         <div style="flex: 1;"></div>
         <button class="btn btn--primary coverDownloadBtn" style="padding: 12px; font-size: 15px; width: 100%; justify-content: center; gap: 8px;" :disabled="isCoverDownloading" @click="downloadCover">

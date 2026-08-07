@@ -1,0 +1,60 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "appId": "cn.auracard.desktop",
+  "productName": "光语AuraCard",
+  "copyright": "Copyright © AuraCard",
+  "directories": {
+    "output": "E:/cursor-agent/deliverables/AuraCard-desktop-2026-08-07",
+    "buildResources": "electron/build"
+  },
+  "files": [
+    "dist/**/*",
+    "electron/**/*",
+    "package.json"
+  ],
+  "extraResources": [
+    {
+      "from": "dist",
+      "to": "dist"
+    }
+  ],
+  "asar": true,
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      },
+      {
+        "target": "portable",
+        "arch": ["x64"]
+      }
+    ],
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "icon": "public/logo.png"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "光语 AuraCard",
+    "installerLanguages": ["zh_CN", "en_US"],
+    "language": "2052"
+  },
+  "mac": {
+    "target": [
+      {
+        "target": "dmg",
+        "arch": ["x64", "arm64"]
+      },
+      {
+        "target": "zip",
+        "arch": ["x64", "arm64"]
+      }
+    ],
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "category": "public.app-category.graphics-design",
+    "icon": "public/logo.png"
+  }
+}

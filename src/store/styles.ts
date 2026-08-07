@@ -5,6 +5,8 @@ import {
   accent,
   textColor,
   textAlignment,
+  contentTextAlignment,
+  contentFontSizePx,
   width,
   height,
   radius,
@@ -18,6 +20,13 @@ import {
 } from "./state";
 import { hexToRgb, relativeLuminance } from "./utils";
 import { modeVisuals, resolveModeStyle, getTemplateIconUrl } from "./modeVisuals";
+import { cardFontFamilyCss } from "./fonts";
+
+export function resolveContentFontMetrics(fontSizePx = contentFontSizePx.value) {
+  const size = Math.min(32, Math.max(12, Math.round(fontSizePx || 18)));
+  const lineHeight = size <= 15 ? 1.72 : size <= 20 ? 1.65 : size <= 24 ? 1.55 : 1.48;
+  return { size, lineHeight };
+}
 
 // ---- 背景 CSS ----
 
@@ -51,10 +60,7 @@ export const isLightText = computed(() => {
 
 export const cardStyle = computed(() => {
   const t = selectedTemplate.value;
-  const contentWidth = width.value - padding.value * 2;
-  const contentFontSize =
-    contentWidth <= 340 ? "17px" : contentWidth <= 420 ? "18px" : "20px";
-  const contentLineHeight = contentWidth <= 340 ? "1.72" : "1.65";
+  const { size, lineHeight } = resolveContentFontMetrics();
   return {
     width: `${width.value}px`,
     minHeight: `${height.value}px`,
@@ -62,12 +68,12 @@ export const cardStyle = computed(() => {
     borderRadius: `${radius.value}px`,
     padding: `${padding.value}px`,
     color: textColor.value,
+    fontFamily: cardFontFamilyCss(),
     background: "transparent",
     border: t.border ? "1px solid rgba(17, 24, 39, 0.08)" : "none",
     boxShadow: t.shadow ? "0 18px 60px rgba(17, 24, 39, 0.18)" : "none",
-    textAlign: textAlignment.value,
-    "--card-content-font-size": contentFontSize,
-    "--card-content-line-height": contentLineHeight,
+    "--card-content-font-size": `${size}px`,
+    "--card-content-line-height": String(lineHeight),
     position: "relative",
     zIndex: 1,
     overflow: "hidden",
@@ -172,7 +178,8 @@ export const cardBodyStyle = computed(() => {
   const inset = visuals?.bodyInset ?? { top: 40, bottom: 44, justifyCenter: false };
 
   const base: Record<string, string | number> = {
-    zIndex: 10,
+    // 低于卡片贴纸层（CardPreview .card__stickers z-index:30），否则标题/正文会抢走贴纸点击
+    zIndex: 2,
     position: "relative",
   };
 
@@ -217,6 +224,7 @@ export const titleStyle = computed(() => {
 
   return {
     color: textColor.value,
+    textAlign: textAlignment.value,
     borderLeft:
       showBorder && textAlignment.value === "left"
         ? `4px solid ${accent.value}`
@@ -234,6 +242,17 @@ export const subtitleStyle = computed(() => {
       selectedTemplate.value.id === "C"
         ? "rgba(229, 231, 235, 0.82)"
         : "rgba(17, 24, 39, 0.72)",
+    textAlign: textAlignment.value,
+  } as const;
+});
+
+/** 正文对齐与字号（独立于标题） */
+export const contentStyle = computed(() => {
+  const { size, lineHeight } = resolveContentFontMetrics();
+  return {
+    textAlign: contentTextAlignment.value,
+    fontSize: `${size}px`,
+    lineHeight: String(lineHeight),
   } as const;
 });
 

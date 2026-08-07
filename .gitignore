@@ -1,8 +1,13 @@
 node_modules/
 dist/
+release/
 .DS_Store
+.env
 .env.local
 .env.*.local
+*.exe
+*.dmg
+*.AppImage
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

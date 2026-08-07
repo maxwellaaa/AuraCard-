@@ -1,0 +1,47 @@
+{
+  "updatedAt": "2026-08-07",
+  "fonts": [
+    {
+      "id": "noto-sans-sc",
+      "label": "思源黑体",
+      "family": "\"Noto Sans SC\", \"PingFang SC\", sans-serif",
+      "google": "Noto+Sans+SC:wght@400;500;700",
+      "category": "sans"
+    },
+    {
+      "id": "noto-serif-sc",
+      "label": "思源宋体",
+      "family": "\"Noto Serif SC\", \"Songti SC\", serif",
+      "google": "Noto+Serif+SC:wght@400;600;700;900",
+      "category": "serif"
+    },
+    {
+      "id": "zcool-xiaowei",
+      "label": "站酷小薇",
+      "family": "\"ZCOOL XiaoWei\", serif",
+      "google": "ZCOOL+XiaoWei",
+      "category": "serif"
+    },
+    {
+      "id": "zcool-kuaile",
+      "label": "站酷快乐体",
+      "family": "\"ZCOOL KuaiLe\", sans-serif",
+      "google": "ZCOOL+KuaiLe",
+      "category": "display"
+    },
+    {
+      "id": "ma-shan",
+      "label": "马善政毛笔",
+      "family": "\"Ma Shan Zheng\", cursive",
+      "google": "Ma+Shan+Zheng",
+      "category": "handwriting"
+    },
+    {
+      "id": "lxgw",
+      "label": "霞鹜文楷（需自建 CSS）",
+      "family": "\"LXGW WenKai\", serif",
+      "cssUrl": "",
+      "category": "serif"
+    }
+  ]
+}

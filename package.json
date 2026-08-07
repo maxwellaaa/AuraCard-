@@ -1,13 +1,20 @@
 {
-  "name": "card",
+  "name": "auracard",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "光语 AuraCard — AI 图文卡片桌面端",
+  "author": "AuraCard",
+  "main": "electron/main.cjs",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -p tsconfig.json && vite build",
     "preview": "vite preview",
-    "typecheck": "vue-tsc -p tsconfig.json --noEmit"
+    "typecheck": "vue-tsc -p tsconfig.json --noEmit",
+    "electron:dev": "npm run build && electron .",
+    "dist:win": "npm run build && electron-builder --win --config electron-builder.yml",
+    "dist:mac": "npm run build && electron-builder --mac --config electron-builder.yml",
+    "dist:dir": "npm run build && electron-builder --win dir --config electron-builder.yml"
   },
   "dependencies": {
     "@types/dompurify": "^3.0.5",
@@ -25,6 +32,8 @@
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.6.2",
     "autoprefixer": "^10.5.4",
+    "electron": "^34.5.8",
+    "electron-builder": "^25.1.8",
     "postcss": "^8.5.20",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.5.4",

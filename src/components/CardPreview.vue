@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import { ref, nextTick, onMounted, onBeforeUnmount, computed } from 'vue';
 import { marked } from 'marked';
 
 import {
@@ -21,20 +21,117 @@ import {
   showSubtitle,
   subtitleStyle,
   subtitle,
+  contentStyle,
   splitContents,
   content,
   showWatermark,
   watermark,
-  isDownloading
+  isDownloading,
+  sectionMode,
+  cardSections,
+  activeCardIndex,
+  updateSectionField,
+  removeCardPage,
+  selectCard,
+  resolveCardStyle,
+  resolveContentFontMetrics,
+  accent,
+  trackInlineSelection,
+  clearInlineSelection,
+  looksLikeHtml,
+  sanitizeCardHtml,
+  suppressBodyBlur,
+  placedStickers,
+  selectedStickerId,
+  selectSticker,
+  updatePlacedSticker,
+  removePlacedSticker,
 } from '../store';
 
 const props = defineProps<{
   text: string;
   index: number;
+  cardTitle?: string;
+  cardSubtitle?: string;
 }>();
 
 const cardRef = ref<HTMLElement | null>(null);
 const editingIndex = ref<Record<number, boolean>>({});
+
+const totalCards = computed(() =>
+  sectionMode.value && cardSections.value.length
+    ? cardSections.value.length
+    : splitContents.value.length,
+);
+
+const canRemovePage = computed(
+  () => sectionMode.value && cardSections.value.length > 1,
+);
+
+const isActiveCard = computed(() => activeCardIndex.value === props.index);
+
+const cardLocalStyle = computed(() => {
+  if (sectionMode.value && cardSections.value[props.index]) {
+    return resolveCardStyle(cardSections.value[props.index].style);
+  }
+  return resolveCardStyle(undefined);
+});
+
+const localTitleStyle = computed(() => {
+  const local = cardLocalStyle.value;
+  const base = { ...(titleStyle.value as Record<string, string>) };
+  base.color = local.textColor;
+  base.textAlign = local.titleAlign;
+  if (local.titleAlign === 'left') {
+    base.borderLeft = `4px solid ${accent.value}`;
+    base.paddingLeft = '12px';
+  } else {
+    base.borderLeft = 'none';
+    base.paddingLeft = '0';
+  }
+  return base;
+});
+
+const localSubtitleStyle = computed(() => {
+  const local = cardLocalStyle.value;
+  return {
+    ...subtitleStyle.value,
+    textAlign: local.titleAlign,
+  } as const;
+});
+
+const localContentStyle = computed(() => {
+  const local = cardLocalStyle.value;
+  const { size, lineHeight } = resolveContentFontMetrics(local.fontSizePx);
+  return {
+    ...contentStyle.value,
+    color: local.textColor,
+    textAlign: local.contentAlign,
+    fontSize: `${size}px`,
+    lineHeight: String(lineHeight),
+  } as const;
+});
+
+const localCardShellStyle = computed(() => ({
+  ...cardStyle.value,
+  color: cardLocalStyle.value.textColor,
+  '--card-content-font-size': `${cardLocalStyle.value.fontSizePx}px`,
+}));
+
+const displayTitle = computed(() => {
+  if (sectionMode.value) return props.cardTitle ?? '';
+  return props.index === 0 ? title.value : '';
+});
+
+const displaySubtitle = computed(() => {
+  if (!showSubtitle.value) return '';
+  if (sectionMode.value) return props.cardSubtitle || '';
+  return props.index === 0 ? subtitle.value : '';
+});
+
+const showTitleBlock = computed(
+  () => sectionMode.value || props.index === 0 || Boolean(displayTitle.value),
+);
 
 onMounted(() => {
   if (cardRef.value) {
@@ -49,41 +146,174 @@ onBeforeUnmount(() => {
 });
 
 const renderMarkdown = (text: string) => {
-  return marked.parse(text);
+  if (looksLikeHtml(text)) return sanitizeCardHtml(text);
+  return sanitizeCardHtml(String(marked.parse(text || '') || ''));
 };
 
 const handleTitleBlur = (e: Event) => {
-  title.value = (e.target as HTMLElement).innerText;
+  clearInlineSelection();
+  const value = (e.target as HTMLElement).innerText;
+  if (sectionMode.value) {
+    updateSectionField(props.index, 'title', value);
+    return;
+  }
+  title.value = value;
 };
 
 const handleSubtitleBlur = (e: Event) => {
-  subtitle.value = (e.target as HTMLElement).innerText;
+  clearInlineSelection();
+  const value = (e.target as HTMLElement).innerText;
+  if (sectionMode.value) {
+    updateSectionField(props.index, 'subtitle', value);
+    return;
+  }
+  subtitle.value = value;
 };
 
 const handleWatermarkBlur = (e: Event) => {
   watermark.value = (e.target as HTMLElement).innerText;
 };
 
+const trackBodySelection = () => {
+  const el = document.getElementById(`edit-content-${props.index}`);
+  trackInlineSelection(props.index, 'body', el);
+};
+
 const startEdit = async (index: number) => {
+  selectCard(index);
   editingIndex.value[index] = true;
   await nextTick();
   const el = document.getElementById(`edit-content-${index}`);
-  if (el) {
-    el.focus();
-    const selection = window.getSelection();
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    range.collapse(false);
-    selection?.removeAllRanges();
-    selection?.addRange(range);
-  }
+  if (!el) return;
+  const raw = props.text || '';
+  el.innerHTML = looksLikeHtml(raw)
+    ? sanitizeCardHtml(raw)
+    : sanitizeCardHtml(String(marked.parse(raw) || ''));
+  el.focus();
 };
 
 const finishEdit = (index: number, e: Event) => {
+  const related = (e as FocusEvent).relatedTarget as HTMLElement | null;
+  // 点左侧字号/颜色时不要退出编辑，否则选区样式无法落盘
+  if (
+    suppressBodyBlur.value ||
+    related?.closest?.('.settings-panel, .fontSizeRow, .colorPickerLight')
+  ) {
+    return;
+  }
+  clearInlineSelection();
   editingIndex.value[index] = false;
+  const el = e.target as HTMLElement;
+  const nextBody = sanitizeCardHtml(el.innerHTML || '');
+  if (sectionMode.value) {
+    updateSectionField(index, 'body', nextBody);
+    return;
+  }
   const parts = [...splitContents.value];
-  parts[index] = (e.target as HTMLElement).innerText || '';
-  content.value = parts.join('\n\n');
+  parts[index] = nextBody;
+  content.value = parts.join('\n\n---\n\n');
+};
+
+const onSelectCard = (e?: Event) => {
+  // 点在贴纸上时不取消选中（兜底；贴纸自身也会 stopPropagation）
+  const target = e?.target as HTMLElement | null;
+  if (target?.closest?.('.card__sticker')) return;
+  selectCard(props.index);
+  selectSticker(null);
+};
+
+/** 选中贴纸时移出输入焦点，否则 Delete/Backspace 会被输入框吃掉 */
+const blurTypingFocus = () => {
+  const active = document.activeElement as HTMLElement | null;
+  if (!active || active === document.body) return;
+  const tag = active.tagName;
+  if (
+    tag === 'INPUT' ||
+    tag === 'TEXTAREA' ||
+    tag === 'SELECT' ||
+    active.isContentEditable ||
+    active.getAttribute('contenteditable')
+  ) {
+    active.blur();
+  }
+};
+
+let dragStickerId: string | null = null;
+let dragMode: 'move' | 'resize' = 'move';
+let dragStart = { x: 0, y: 0, sx: 0, sy: 0, size: 0 };
+
+const onStickerPointerDown = (e: PointerEvent, id: string) => {
+  e.stopPropagation();
+  e.preventDefault();
+  blurTypingFocus();
+  selectCard(props.index);
+  selectSticker(id);
+  const card = cardRef.value;
+  if (!card) return;
+  const rect = card.getBoundingClientRect();
+  const sticker = placedStickers.value.find((s) => s.id === id);
+  if (!sticker) return;
+  dragStickerId = id;
+  dragMode = 'move';
+  dragStart = {
+    x: e.clientX,
+    y: e.clientY,
+    sx: sticker.x,
+    sy: sticker.y,
+    size: sticker.size,
+  };
+  (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+
+  const onMove = (ev: PointerEvent) => {
+    if (!dragStickerId || dragMode !== 'move') return;
+    const dx = ((ev.clientX - dragStart.x) / rect.width) * 100;
+    const dy = ((ev.clientY - dragStart.y) / rect.height) * 100;
+    updatePlacedSticker(dragStickerId, {
+      x: Math.max(0, Math.min(92, dragStart.sx + dx)),
+      y: Math.max(0, Math.min(92, dragStart.sy + dy)),
+    });
+  };
+  const onUp = () => {
+    dragStickerId = null;
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+  };
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+};
+
+const onStickerResizePointerDown = (e: PointerEvent, id: string) => {
+  e.stopPropagation();
+  e.preventDefault();
+  blurTypingFocus();
+  selectCard(props.index);
+  selectSticker(id);
+  const sticker = placedStickers.value.find((s) => s.id === id);
+  if (!sticker) return;
+  dragStickerId = id;
+  dragMode = 'resize';
+  dragStart = {
+    x: e.clientX,
+    y: e.clientY,
+    sx: sticker.x,
+    sy: sticker.y,
+    size: sticker.size,
+  };
+  (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+
+  const onMove = (ev: PointerEvent) => {
+    if (!dragStickerId || dragMode !== 'resize') return;
+    const delta = Math.max(ev.clientX - dragStart.x, ev.clientY - dragStart.y);
+    const next = Math.round(Math.max(16, Math.min(96, dragStart.size + delta * 0.35)));
+    updatePlacedSticker(dragStickerId, { size: next });
+  };
+  const onUp = () => {
+    dragStickerId = null;
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+  };
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
 };
 </script>
 
@@ -94,17 +324,27 @@ export default {
 </script>
 
 <template>
-  <div 
+  <div
     class="card-wrapper"
-    :class="{ 'is-downloading': isDownloading }"
+    :class="{ 'is-downloading': isDownloading, 'is-active-card': isActiveCard }"
+    @click="onSelectCard"
   >
-    <div v-if="splitContents.length > 1" class="card-page-number">
-      {{ index + 1 }}/{{ splitContents.length }}
+    <div v-if="totalCards > 1 || sectionMode" class="card-page-number">
+      <span>{{ index + 1 }}/{{ totalCards }}{{ isActiveCard ? ' · 编辑中' : '' }}</span>
+      <button
+        v-if="canRemovePage"
+        type="button"
+        class="card-page-remove"
+        title="删除此页"
+        @click.stop="removeCardPage(index)"
+      >
+        删除
+      </button>
     </div>
-    <div 
-      class="card" 
-      ref="cardRef" 
-      :style="cardStyle"
+    <div
+      class="card"
+      ref="cardRef"
+      :style="localCardShellStyle"
     >
       <div class="card__layers">
         <div class="card__canvas" :style="cardCanvasStyle" />
@@ -128,40 +368,103 @@ export default {
         <span v-else-if="cardTopMeta.showCenterDot" class="card__topMetaDot" />
       </div>
       <div class="card__body" :style="cardBodyStyle">
-        <div 
-          v-if="index === 0" 
-          class="card__title" 
-          :style="titleStyle"
+        <div
+          v-if="showTitleBlock"
+          class="card__title"
+          :style="localTitleStyle"
           contenteditable="plaintext-only"
           data-placeholder="输入标题..."
+          @focus="onSelectCard"
           @blur="handleTitleBlur"
-        >{{ title }}</div>
-        <div 
-          v-if="index === 0 && showSubtitle" 
-          class="card__subtitle" 
-          :style="subtitleStyle"
+        >{{ displayTitle }}</div>
+        <div
+          v-if="displaySubtitle"
+          class="card__subtitle"
+          :style="localSubtitleStyle"
           contenteditable="plaintext-only"
           data-placeholder="输入副标题..."
+          @focus="onSelectCard"
           @blur="handleSubtitleBlur"
-        >{{ subtitle }}</div>
+        >{{ displaySubtitle }}</div>
         <div class="card__content-wrapper">
-          <div 
+          <div
             v-if="!editingIndex[index]"
             class="card__content markdown-body"
+            :style="localContentStyle"
             v-html="renderMarkdown(text)"
             @click="startEdit(index)"
           ></div>
-          <div 
+          <div
             v-else
             :id="`edit-content-${index}`"
-            class="card__content"
-            contenteditable="plaintext-only"
-            data-placeholder="输入正文内容..."
+            class="card__content markdown-body"
+            :style="localContentStyle"
+            contenteditable="true"
+            data-placeholder="输入正文内容，选中文字后可在左侧单独调字号/颜色…"
+            @mouseup="trackBodySelection"
+            @keyup="trackBodySelection"
             @blur="e => finishEdit(index, e)"
-          >{{ text }}</div>
+          ></div>
         </div>
       </div>
-      <div class="card__watermark" v-if="showWatermark" contenteditable="plaintext-only" data-placeholder="输入水印..." @blur="handleWatermarkBlur">{{ watermark }}</div>
+      <div
+        class="card__watermark"
+        v-if="showWatermark"
+        contenteditable="plaintext-only"
+        data-placeholder="输入水印..."
+        @blur="handleWatermarkBlur"
+      >{{ watermark }}</div>
+      <div class="card__stickers" aria-hidden="false">
+        <div
+          v-for="sticker in placedStickers"
+          :key="sticker.id"
+          class="card__sticker"
+          :class="{ 'is-selected': selectedStickerId === sticker.id }"
+          :style="{
+            left: `${sticker.x}%`,
+            top: `${sticker.y}%`,
+            fontSize: `${sticker.size}px`,
+            color: sticker.color,
+            opacity: sticker.opacity,
+            transform: `translate(-50%, -50%) rotate(${sticker.rotate}deg)`,
+          }"
+          @pointerdown="(e) => onStickerPointerDown(e, sticker.id)"
+          @mousedown.stop.prevent
+          @click.stop
+          @dblclick.stop="removePlacedSticker(sticker.id)"
+          :title="selectedStickerId === sticker.id ? '拖动移动 · 角点缩放 · Delete 删除 · Esc 取消 · 双击删除' : '点击选中'"
+        >
+          <svg
+            v-if="sticker.kind === 'svg' && sticker.svgPath"
+            class="card__stickerSvg"
+            :viewBox="sticker.svgViewBox || '0 0 24 24'"
+            :width="sticker.size"
+            :height="sticker.size"
+          >
+            <path
+              :d="sticker.svgPath"
+              :fill="sticker.svgStroke ? 'none' : 'currentColor'"
+              :stroke="sticker.svgStroke ? 'currentColor' : undefined"
+              :stroke-width="sticker.svgStroke ? 2 : undefined"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <span v-else class="card__stickerText" :class="{ 'is-label': sticker.kind === 'text' }">
+            {{ sticker.content }}
+          </span>
+          <button
+            v-if="selectedStickerId === sticker.id && !isDownloading"
+            type="button"
+            class="card__stickerHandle"
+            title="拖动缩放"
+            aria-label="缩放贴纸"
+            @pointerdown.stop="(e) => onStickerResizePointerDown(e, sticker.id)"
+            @mousedown.stop.prevent
+            @click.stop
+          />
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -171,22 +474,45 @@ export default {
   position: relative;
 }
 
+.card-wrapper.is-active-card .card {
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.35), 0 18px 60px rgba(17, 24, 39, 0.12);
+}
+
 .card-page-number {
   position: absolute;
   top: -30px;
   left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   font-size: 14px;
-  color: #9ca3af; /* 柔和的灰色，类似 Tailwind 的 gray-400 */
+  color: #9ca3af;
   font-weight: 500;
   letter-spacing: 1px;
   z-index: 10;
+}
+
+.card-page-remove {
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.card-page-remove:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
 }
 
 .card {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  /* Remove overflow: hidden to let the card expand organically with its content */
 }
 
 .card__layers {
@@ -237,9 +563,9 @@ export default {
   gap: 16px;
   min-height: 0;
   position: relative;
+  /* 正文层保持可编辑；贴纸层 z-index 必须更高，否则标题会抢走点击 */
   z-index: 1;
   padding-bottom: 40px;
-  /* Allow content to push the bounds without scrollbars since we use max-content height */
   overflow: visible;
 }
 
@@ -351,9 +677,8 @@ export default {
   flex-direction: column;
 }
 
-/* Markdown specific styles */
 :deep(.markdown-body) {
-  white-space: normal; /* Override pre-wrap for markdown HTML */
+  white-space: normal;
 }
 :deep(.markdown-body) p {
   margin-top: 0;
@@ -414,4 +739,85 @@ export default {
   min-height: 1em;
 }
 
+.card__stickers {
+  position: absolute;
+  inset: 0;
+  /* 高于 cardBodyStyle 的 inline zIndex:10，确保贴纸可点选 */
+  z-index: 30;
+  pointer-events: none;
+}
+
+.card__sticker {
+  position: absolute;
+  pointer-events: auto;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  line-height: 1;
+  /* 扩大命中区域，避免点到下方 contenteditable */
+  padding: 6px;
+  margin: -6px;
+  border-radius: 8px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.12));
+  z-index: 1;
+}
+
+.card__sticker:active {
+  cursor: grabbing;
+}
+
+.card__sticker.is-selected {
+  outline: none;
+  box-shadow:
+    0 0 0 2px #fff,
+    0 0 0 4px rgba(37, 99, 235, 0.85);
+  background: rgba(37, 99, 235, 0.06);
+  filter: drop-shadow(0 2px 6px rgba(37, 99, 235, 0.25));
+}
+
+.card__stickerHandle {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 2px solid #2563eb;
+  border-radius: 3px;
+  background: #fff;
+  cursor: nwse-resize;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25);
+  z-index: 2;
+  pointer-events: auto;
+}
+
+.is-downloading .card__sticker.is-selected {
+  box-shadow: none;
+  background: transparent;
+}
+
+.is-downloading .card__stickerHandle {
+  display: none !important;
+}
+
+.card__stickerText {
+  display: inline-block;
+  pointer-events: none;
+}
+
+.card__stickerText.is-label {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 14%, white);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  font-size: 0.72em;
+}
+
+.card__stickerSvg {
+  display: block;
+  pointer-events: none;
+}
 </style>

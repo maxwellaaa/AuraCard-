@@ -19,8 +19,25 @@ const SANITIZE_CONFIG: DOMPurify.Config = {
   FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'textarea', 'button'],
 }
 
+/** 卡片正文：允许 span/p 等带 style，用于选区字号/颜色 */
+const CARD_HTML_SANITIZE_CONFIG: DOMPurify.Config = {
+  ALLOWED_TAGS: SANITIZE_CONFIG.ALLOWED_TAGS,
+  ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'target', 'rel', 'width', 'height', 'style'],
+  ALLOW_DATA_ATTR: false,
+  FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'],
+  FORBID_TAGS: SANITIZE_CONFIG.FORBID_TAGS,
+}
+
 export function sanitizeHtml(dirty: string): string {
   return DOMPurify.sanitize(dirty, SANITIZE_CONFIG) as string
+}
+
+export function sanitizeCardHtml(dirty: string): string {
+  return DOMPurify.sanitize(dirty, CARD_HTML_SANITIZE_CONFIG) as string
+}
+
+export function looksLikeHtml(text: string) {
+  return /<\/?[a-z][\s\S]*>/i.test(text || '')
 }
 
 export function hexToRgb(hex: string) {

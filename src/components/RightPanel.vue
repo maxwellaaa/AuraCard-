@@ -18,6 +18,7 @@ import {
   aiBaseUrl,
   aiModel,
   aiSummarizeMessage,
+  layoutContentAsCards,
   aiProvider,
   aiProviderOptions,
   aiTestMessage,
@@ -212,9 +213,25 @@ watch(chatInput, () => {
       <div class="chatBody" ref="chatBodyRef">
         <div v-for="m in chatMessages" :key="m.id" class="bubble" :class="m.role === 'user' ? 'bubble--user' : 'bubble--ai'">
           <div class="bubble__content" v-html="renderMarkdown(m.content)" />
-          <div v-if="m.role === 'assistant' && m.id !== 'welcome'" class="bubble__actions">
-            <button class="btn btn--ghost btn--sm" type="button" :disabled="isChatLoading" @click="aiSummarizeMessage(m.content)">
-              生成卡片
+          <div v-if="m.id !== 'welcome'" class="bubble__actions">
+            <button
+              class="btn btn--primary btn--sm"
+              type="button"
+              :disabled="isChatLoading"
+              title="按原文结构直接排版，不经 AI 重写"
+              @click="layoutContentAsCards(m.content)"
+            >
+              直接排版
+            </button>
+            <button
+              v-if="m.role === 'assistant'"
+              class="btn btn--ghost btn--sm"
+              type="button"
+              :disabled="isChatLoading"
+              title="让 AI 重新整理成标题/副标题/正文"
+              @click="aiSummarizeMessage(m.content)"
+            >
+              AI 整理
             </button>
           </div>
         </div>
@@ -249,7 +266,7 @@ watch(chatInput, () => {
         </div>
         <div class="chatComposer__hint">
           <span v-if="chatInput.trim()">Shift + Enter 换行</span>
-          <span v-else>试试让 AI 帮你整理图文内容</span>
+          <span v-else>发送后可「直接排版」，或让 AI 整理</span>
         </div>
       </div>
     </div>

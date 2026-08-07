@@ -22,6 +22,17 @@ export type AspectPreset = {
   h: number;
 };
 
+export type ExportResolutionId = "x2" | "hd" | "hq" | "2k" | "4k";
+export type ExportResolutionPreset = {
+  id: ExportResolutionId;
+  label: string;
+  hint: string;
+  /** 相对画布倍数；与 targetWidth 二选一 */
+  pixelRatio?: number;
+  /** 按当前比例换算导出宽度（px），适合小红书/IG 等竖图 */
+  targetWidth?: number;
+};
+
 export type BgTab = "solid" | "gradient" | "image";
 
 export type ChatRole = "user" | "assistant";
@@ -42,4 +53,20 @@ export type AiProviderOption = {
   baseUrl: string;
   apiKeyPlaceholder: string;
   models: AiModelOption[];
+};
+
+export type CardTextStyle = {
+  fontSizePx?: number;
+  titleAlign?: "left" | "center" | "right" | "justify";
+  contentAlign?: "left" | "center" | "right";
+  textColor?: string;
+};
+
+export type CardSection = {
+  id: string;
+  title: string;
+  subtitle: string;
+  body: string;
+  /** 单卡文字样式；缺省时回退到全局设置 */
+  style?: CardTextStyle;
 };

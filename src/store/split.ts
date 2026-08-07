@@ -10,7 +10,11 @@ import {
   showWatermark,
   selectedTemplate,
   splitContents,
+  sectionMode,
+  cardSections,
+  contentFontSizePx,
 } from "./state";
+import { resolveContentFontMetrics } from "./styles";
 
 // ---- 1. Markdown 标准化 ----
 
@@ -312,7 +316,17 @@ const DEBOUNCE_MS = 250;
 
 export function initSplit() {
   watch(
-    [content, width, height, padding, title, subtitle, showWatermark, selectedTemplate],
+    [
+      content,
+      width,
+      height,
+      padding,
+      title,
+      subtitle,
+      showWatermark,
+      selectedTemplate,
+      contentFontSizePx,
+    ],
     () => {
       // Debounce：避免每次按键触发完整重算
       if (debounceTimer) clearTimeout(debounceTimer);
@@ -325,6 +339,14 @@ export function initSplit() {
 }
 
 function doSplit() {
+  // 分段卡片模式：以 cardSections 为准，避免编辑单卡后被高度算法重切
+  if (sectionMode.value) {
+    splitContents.value = cardSections.value.length
+      ? cardSections.value.map((s) => s.body)
+      : [""];
+    return;
+  }
+
   const text = content.value.trim();
   if (!text) {
     splitContents.value = [""];
@@ -333,9 +355,8 @@ function doSplit() {
 
   const normalizedText = normalizeMarkdown(text);
   const contentWidth = width.value - padding.value * 2;
-  const contentFontSize =
-    contentWidth <= 340 ? 17 : contentWidth <= 420 ? 18 : 20;
-  const contentLineHeight = contentWidth <= 340 ? 1.72 : 1.65;
+  const { size: contentFontSize, lineHeight: contentLineHeight } =
+    resolveContentFontMetrics(contentFontSizePx.value);
   const mode = selectedTemplate.value.backgroundMode;
 
   const { firstCardAvailableHeight, baseAvailableHeight } = calcAvailableHeight(

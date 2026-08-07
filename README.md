@@ -100,3 +100,12 @@ VITE_API_BASE_URL=/api
 - `npm run typecheck`：TypeScript 类型检查
 - `npm run build`：构建打包
 - `npm run preview`：本地预览构建产物
+- `npm run electron:dev`：构建后启动 Electron 桌面端
+- `npm run dist:win`：打包 Windows 安装包 + portable
+- `npm run dist:mac`：打包 macOS（建议在 macOS / CI 执行）
+
+## Release Notes（2026-08-07）
+
+本轮重点：选中文字局部字号/颜色/对齐（保留选区、不误伤未选中正文）、封面本地图片导入、在线字体 / 在线贴纸 / 用户预设三入口二级菜单、开源风格贴纸交互（拖动缩放与 Delete/Esc）、Electron 桌面打包。
+
+详细说明见 [`docs/CHANGELOG-2026-08-07.md`](docs/CHANGELOG-2026-08-07.md)。
