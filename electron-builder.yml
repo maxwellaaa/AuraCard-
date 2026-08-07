@@ -33,15 +33,6 @@
     "artifactName": "${productName}-${version}-${arch}.${ext}",
     "icon": "public/logo.png"
   },
-  "nsis": {
-    "oneClick": false,
-    "allowToChangeInstallationDirectory": true,
-    "createDesktopShortcut": true,
-    "createStartMenuShortcut": true,
-    "shortcutName": "光语 AuraCard",
-    "installerLanguages": ["zh_CN", "en_US"],
-    "language": "2052"
-  },
   "mac": {
     "target": [
       {
@@ -55,6 +46,16 @@
     ],
     "artifactName": "${productName}-${version}-${arch}.${ext}",
     "category": "public.app-category.graphics-design",
-    "icon": "public/logo.png"
+    "icon": "public/logo.png",
+    "identity": null
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "光语 AuraCard",
+    "installerLanguages": ["zh_CN", "en_US"],
+    "language": "2052"
   }
 }
