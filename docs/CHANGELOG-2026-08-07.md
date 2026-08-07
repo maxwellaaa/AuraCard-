@@ -112,9 +112,15 @@
 
 ## 十一、已知限制 / 构建说明
 
-1. **Mac 安装包**：在 Windows 主机上交叉编译 macOS 目标常失败或无法签名；若本轮无 `.dmg`/`.zip` 产物，需在 macOS 或 CI 上执行 `npm run dist:mac`。
-2. **AI 能力**：桌面端依赖用户配置的 Key；无 Key 时相关生成会提示错误，不影响纯编辑与导出。
-3. **贴纸版权**：内置为 emoji/自绘 SVG 示意包，非第三方商用贴纸库镜像。
+1. **Mac 安装包**：本轮在 Windows 上执行 `electron-builder --mac` 直接失败（官方仅支持在 macOS 上打 Mac 包）。需在 macOS 主机或 GitHub Actions `macos-*` runner 上执行 `npm run dist:mac`。配置已预留 `mac` 目标（dmg/zip、x64+arm64、`identity: null` 跳过签名）。
+2. **Windows 产物（本轮已生成）**：输出目录 `E:\cursor-agent\deliverables\AuraCard-desktop-2026-08-07\`  
+   - `光语AuraCard-1.0.0-x64-setup.exe`（NSIS 安装包）  
+   - `光语AuraCard-1.0.0-x64-portable.exe`（便携版）  
+   - `win-unpacked\`（未打包目录）  
+   图标改为 `electron/build/icon.ico`（由 png-to-ico 生成），避免大 PNG 转 ICO 导致 NSIS `can't open file`。
+3. **AI 能力**：桌面端依赖用户配置的 Key；无 Key 时相关生成会提示错误，不影响纯编辑与导出。
+4. **贴纸版权**：内置为 emoji/自绘 SVG 示意包，非第三方商用贴纸库镜像。
+5. **GitHub 推送**：本机 Git 凭据用户为 `maxwellaaa`，对 `oniontang/AuraCard` 无写权限（403）；应推送到当前登录用户的个人仓库。
 
 ---
 
