@@ -1,5 +1,6 @@
 const path = require('path')
-const { app, BrowserWindow, shell } = require('electron')
+const fs = require('fs/promises')
+const { app, BrowserWindow, shell, dialog, ipcMain } = require('electron')
 const { startDesktopServer } = require('./server.cjs')
 
 /** @type {BrowserWindow | null} */
@@ -12,6 +13,57 @@ function resolveDistDir() {
     return path.join(__dirname, '..', 'dist')
   }
   return path.join(process.resourcesPath, 'dist')
+}
+
+function registerDesktopIpc() {
+  ipcMain.handle('aura:save-file', async (event, payload = {}) => {
+    try {
+      const defaultPath = String(payload.defaultPath || 'download.bin')
+      const dataBase64 = String(payload.dataBase64 || '')
+      const filters = Array.isArray(payload.filters) ? payload.filters : undefined
+      if (!dataBase64) {
+        return { ok: false, error: 'empty file data' }
+      }
+
+      const win = BrowserWindow.fromWebContents(event.sender)
+      const result = await dialog.showSaveDialog(win ?? undefined, {
+        title: '保存文件',
+        defaultPath,
+        filters:
+          filters && filters.length
+            ? filters
+            : [{ name: 'All Files', extensions: ['*'] }],
+      })
+
+      if (result.canceled || !result.filePath) {
+        return { ok: false, canceled: true }
+      }
+
+      await fs.writeFile(result.filePath, Buffer.from(dataBase64, 'base64'))
+      return { ok: true, filePath: result.filePath }
+    } catch (err) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      }
+    }
+  })
+
+  ipcMain.handle('aura:write-file', async (_event, payload = {}) => {
+    try {
+      const filePath = String(payload.filePath || '')
+      const dataBase64 = String(payload.dataBase64 || '')
+      if (!filePath) return { ok: false, error: 'Missing filePath' }
+      if (!dataBase64) return { ok: false, error: 'empty file data' }
+      await fs.writeFile(filePath, Buffer.from(dataBase64, 'base64'))
+      return { ok: true, filePath }
+    } catch (err) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      }
+    }
+  })
 }
 
 async function createWindow() {
@@ -56,6 +108,7 @@ function shutdownServer() {
 }
 
 app.whenReady().then(async () => {
+  registerDesktopIpc()
   await createWindow()
   app.on('activate', async () => {
     if (BrowserWindow.getAllWindows().length === 0) {

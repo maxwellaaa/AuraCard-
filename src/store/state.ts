@@ -98,6 +98,8 @@ export const cardRefs = ref<HTMLElement[]>([]);
 export const previewFrameRef = ref<HTMLElement | null>(null);
 export const previewSize = ref({ width: 0, height: 0 });
 export const isDownloading = ref(false);
+/** 导出进度（打包/逐张下载时更新；结束后清空） */
+export const downloadProgress = ref<{ current: number; total: number } | null>(null);
 export const exportResolutionId = ref<ExportResolutionId>("hd");
 export const errorMessage = ref<string | null>(null);
 export const isSettingsCollapsed = ref(false);
