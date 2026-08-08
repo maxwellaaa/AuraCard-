@@ -136,12 +136,22 @@ import {
   overwritePreset,
   deletePreset,
   presetMessage,
+  savedProjects,
+  saveProjectToLibrary,
+  loadProjectFromLibrary,
+  deleteProjectFromLibrary,
+  exportProjectFile,
+  importProjectFile,
+  exportContentMarkdown,
+  projectMessage,
 } from '../store'
 import { computed, ref } from 'vue'
 import UiPanelIntro from './ui/UiPanelIntro.vue'
 import OnlineStickersPanel from './OnlineStickersPanel.vue'
 
 const presetNameInput = ref('')
+const projectNameInput = ref('')
+const projectFileInputRef = ref<HTMLInputElement | null>(null)
 const customFontLabel = ref('')
 const customFontFamily = ref('')
 const customFontCssUrl = ref('')
@@ -171,6 +181,30 @@ async function onUpdateFonts() {
 function onSavePreset() {
   saveCurrentAsPreset(presetNameInput.value)
   presetNameInput.value = ''
+}
+
+function onSaveProjectLibrary() {
+  saveProjectToLibrary(projectNameInput.value)
+  projectNameInput.value = ''
+}
+
+async function onExportProject() {
+  await exportProjectFile(projectNameInput.value || undefined)
+}
+
+async function onExportText() {
+  await exportContentMarkdown()
+}
+
+function onPickProjectFile() {
+  projectFileInputRef.value?.click()
+}
+
+async function onProjectFileChange(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  await importProjectFile(file)
+  ;(e.target as HTMLInputElement).value = ''
 }
 
 function onAddCustomFont() {
@@ -714,8 +748,40 @@ const editingContentAlign = computed({
 
             <template v-else-if="extraPanel === 'presets'">
               <div class="field">
+                <span class="group__title">保存卡片项目</span>
+                <p class="fontSizeRow__tip">保存完整项目（版式/分页/贴纸等），可本地列表重开或导出 JSON</p>
+                <div style="margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap;">
+                  <input v-model="projectNameInput" class="watermark-input" type="text" placeholder="项目名称" style="flex: 1; min-width: 120px;" />
+                  <button class="btn btn--primary btn--sm" type="button" @click="onSaveProjectLibrary">存到列表</button>
+                  <button class="btn btn--outline btn--sm" type="button" @click="onExportProject">导出 JSON</button>
+                  <button class="btn btn--outline btn--sm" type="button" @click="onPickProjectFile">导入 JSON</button>
+                  <button class="btn btn--outline btn--sm" type="button" @click="onExportText">保存文字 MD</button>
+                  <input
+                    ref="projectFileInputRef"
+                    type="file"
+                    accept=".json,application/json,.auracard.json"
+                    style="display: none"
+                    @change="onProjectFileChange"
+                  />
+                </div>
+                <p v-if="projectMessage" class="fontSizeRow__tip" style="margin-top: 6px;">{{ projectMessage }}</p>
+              </div>
+              <div class="field" style="margin-top: 12px;">
+                <span class="group__title">我的项目</span>
+                <div v-if="savedProjects.length" class="presetList">
+                  <div v-for="p in savedProjects" :key="p.savedAt" class="presetList__item">
+                    <strong class="presetList__name">{{ p.name }}</strong>
+                    <div class="presetList__actions">
+                      <button class="btn btn--outline btn--sm" type="button" @click="loadProjectFromLibrary(String(p.savedAt))">打开</button>
+                      <button class="btn btn--outline btn--sm" type="button" @click="deleteProjectFromLibrary(p.savedAt)">删除</button>
+                    </div>
+                  </div>
+                </div>
+                <p v-else class="fontSizeRow__tip" style="margin-top: 8px;">暂无保存的项目</p>
+              </div>
+              <div class="field" style="margin-top: 12px;">
                 <span class="group__title">保存预设</span>
-                <p class="fontSizeRow__tip">保存当前排版（模板/配色/字体/贴纸/分页等）便于复用</p>
+                <p class="fontSizeRow__tip">仅排版样式快捷复用（模板/配色/字体等）</p>
                 <div style="margin-top: 8px; display: flex; gap: 8px;">
                   <input v-model="presetNameInput" class="watermark-input" type="text" placeholder="预设名称" style="flex: 1;" />
                   <button class="btn btn--primary btn--sm" type="button" @click="onSavePreset">保存</button>

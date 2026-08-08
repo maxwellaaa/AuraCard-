@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
   aiApiKey,
+  aiKeySaveHint,
   aiModel,
   aiProvider,
   aiProviderOptions,
@@ -14,6 +15,7 @@ import {
   isAiSettingsOpen,
   isCustomAiProvider,
   isTestingAiConnection,
+  persistAiApiKeyNow,
   selectedAiProvider,
   testAiConnection,
 } from '../store'
@@ -94,7 +96,7 @@ const isImageModelSelected = computed(() =>
                 <section class="chatConfig__section">
                   <div class="chatConfig__head">
                     <div class="chatConfig__title">API Key</div>
-                    <div class="chatConfig__desc">用于 {{ selectedAiProvider.name }}</div>
+                    <div class="chatConfig__desc">用于 {{ selectedAiProvider.name }} · 填写后自动保存（各供应商独立）</div>
                   </div>
                   <div class="chatConfig__keyRow">
                     <input
@@ -103,6 +105,7 @@ const isImageModelSelected = computed(() =>
                       :type="isAiKeyVisible ? 'text' : 'password'"
                       autocomplete="off"
                       :placeholder="selectedAiProvider.apiKeyPlaceholder"
+                      @blur="persistAiApiKeyNow()"
                     />
                     <button class="chatConfig__iconBtn" type="button" :title="isAiKeyVisible ? '隐藏 Key' : '显示 Key'" @click="isAiKeyVisible = !isAiKeyVisible">
                       {{ isAiKeyVisible ? '🙈' : '👁' }}
@@ -110,6 +113,9 @@ const isImageModelSelected = computed(() =>
                     <button class="chatConfig__testBtn" type="button" :disabled="isTestingAiConnection" @click="testAiConnection">
                       {{ isTestingAiConnection ? '测试中…' : '测试连接' }}
                     </button>
+                  </div>
+                  <div v-if="aiKeySaveHint" class="chatConfig__feedback chatConfig__feedback--success">
+                    {{ aiKeySaveHint }}
                   </div>
                   <div v-if="aiTestMessage" class="chatConfig__feedback" :class="`chatConfig__feedback--${aiTestStatus}`">
                     {{ aiTestMessage }}

@@ -16,6 +16,10 @@ import {
   downloadProgress,
   downloadPng,
   downloadAllCardsZip,
+  cancelDownload,
+  exportProjectFile,
+  exportContentMarkdown,
+  errorMessage,
   resetCardToInitialState,
   sectionMode,
   cardSections,
@@ -134,6 +138,19 @@ const downloadZipAll = async () => {
   await downloadAllCardsZip();
 };
 
+const onCancelDownload = () => {
+  cancelDownload();
+  isDownloadMenuOpen.value = false;
+};
+
+const onSaveProject = async () => {
+  await exportProjectFile();
+};
+
+const onSaveText = async () => {
+  await exportContentMarkdown();
+};
+
 const insertColumnBlock = (dir: ColumnDirection) => {
   const n = clampColCount(colCount.value);
   colCount.value = n;
@@ -216,8 +233,36 @@ onBeforeUnmount(() => {
       </div>
       <div class="content-toolbar__spacer"></div>
       <div class="content-toolbar__group">
+        <button
+          class="btn btn--outline btn--sm content-toolbar__action"
+          type="button"
+          :disabled="isDownloading || isChatLoading"
+          title="导出标题/正文为 Markdown"
+          @click="onSaveText"
+        >
+          保存文字
+        </button>
+        <button
+          class="btn btn--outline btn--sm content-toolbar__action"
+          type="button"
+          :disabled="isDownloading || isChatLoading"
+          title="导出当前卡片项目为 JSON，可稍后重新打开"
+          @click="onSaveProject"
+        >
+          保存项目
+        </button>
         <button class="btn btn--outline btn--sm content-toolbar__action" :disabled="isDownloading || isChatLoading" @click="resetCard">
           重置
+        </button>
+
+        <button
+          v-if="isDownloading"
+          class="btn btn--outline btn--sm content-toolbar__action"
+          type="button"
+          title="取消当前打包/下载"
+          @click="onCancelDownload"
+        >
+          取消下载
         </button>
 
         <div ref="downloadMenuRef" class="download-menu" :class="{ 'is-open': isDownloadMenuOpen }">
@@ -275,6 +320,7 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </div>
+    <p v-if="errorMessage" class="content-toolbar__error" role="status">{{ errorMessage }}</p>
 
     <div class="center-panel__scroll">
       <div class="preview__frame" ref="previewFrameRef">
@@ -365,6 +411,14 @@ onBeforeUnmount(() => {
 <style scoped>
 .center-panel-shell {
   display: contents;
+}
+
+.content-toolbar__error {
+  margin: 0;
+  padding: 0 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--danger-text, #b91c1c);
 }
 
 .content-editor-header__actions {

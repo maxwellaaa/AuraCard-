@@ -6,10 +6,17 @@ declare module '*.vue' {
   export default component
 }
 
-interface AuraDesktopSaveFileResult {
+interface AuraDesktopFileResult {
   ok: boolean
   canceled?: boolean
   filePath?: string
+  error?: string
+}
+
+interface AuraDesktopSecretsResult {
+  ok: boolean
+  keys: Record<string, string>
+  activeProvider?: string | null
   error?: string
 }
 
@@ -18,13 +25,20 @@ interface AuraDesktopApi {
   isDesktop: true
   saveFile: (payload: {
     defaultPath: string
-    dataBase64: string
+    data?: ArrayBuffer | Uint8Array
+    dataBase64?: string
     filters?: { name: string; extensions: string[] }[]
-  }) => Promise<AuraDesktopSaveFileResult>
+  }) => Promise<AuraDesktopFileResult>
   writeFile: (payload: {
     filePath: string
-    dataBase64: string
-  }) => Promise<AuraDesktopSaveFileResult>
+    data?: ArrayBuffer | Uint8Array
+    dataBase64?: string
+  }) => Promise<AuraDesktopFileResult>
+  getSecrets: () => Promise<AuraDesktopSecretsResult>
+  setSecrets: (payload: {
+    keys: Record<string, string>
+    activeProvider?: string | null
+  }) => Promise<{ ok: boolean; error?: string }>
 }
 
 interface Window {

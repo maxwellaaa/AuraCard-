@@ -3,15 +3,12 @@ const { contextBridge, ipcRenderer } = require('electron')
 contextBridge.exposeInMainWorld('auraDesktop', {
   platform: process.platform,
   isDesktop: true,
-  /**
-   * Native save dialog + write file.
-   * Blob / <a download> is unreliable in Electron (especially macOS).
-   * @param {{ defaultPath: string, dataBase64: string, filters?: { name: string, extensions: string[] }[] }} payload
-   */
+  /** Native save dialog + write (Blob/<a download> is unreliable in Electron, esp. macOS). */
   saveFile: (payload) => ipcRenderer.invoke('aura:save-file', payload),
-  /**
-   * Write bytes to an absolute path (no dialog) — used for multi-PNG after first save.
-   * @param {{ filePath: string, dataBase64: string }} payload
-   */
+  /** Write to an absolute path (e.g. sibling PNGs after first save dialog). */
   writeFile: (payload) => ipcRenderer.invoke('aura:write-file', payload),
+  /** Load API keys from Electron userData (survives localhost port changes). */
+  getSecrets: () => ipcRenderer.invoke('aura:secrets-get'),
+  /** Persist API keys (safeStorage when available). */
+  setSecrets: (payload) => ipcRenderer.invoke('aura:secrets-set', payload),
 })

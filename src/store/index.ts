@@ -54,7 +54,13 @@ import { normalizeBaseUrl } from "./utils";
 import { initSplit } from "./split";
 import { initFonts } from "./fonts";
 import { initPresets } from "./presets";
+import { initProjects } from "./project";
 import { clearStickers, initStickers } from "./stickers";
+import {
+  hydrateAiApiKeys,
+  schedulePersistAiApiKey,
+  switchAiProviderKeys,
+} from "./aiKeys";
 import type { TemplateId, AiProviderId, ExportResolutionId } from "./types";
 
 export * from "./types";
@@ -71,6 +77,8 @@ export * from "./mdColumns";
 export * from "./fonts";
 export * from "./stickers";
 export * from "./presets";
+export * from "./project";
+export * from "./aiKeys";
 
 export function resetCardToInitialState() {
   selectedTemplateId.value = "A";
@@ -130,6 +138,7 @@ export function initStore() {
   initFonts();
   initStickers();
   initPresets();
+  initProjects();
 
   // 移动端窗口尺寸监听
   const onResize = () => {
@@ -213,10 +222,6 @@ export function initStore() {
       localStorage.getItem("ai.customBaseUrl") || "https://api.openai.com";
     aiBaseUrl.value = localStorage.getItem("ai.baseUrl") || "";
     aiModel.value = localStorage.getItem("ai.model") || "";
-    // 无 card-server 时走浏览器端 Key + Vite 代理；有 Key 才持久化到本机
-    aiApiKey.value =
-      localStorage.getItem("ai.apiKey") ||
-      String(import.meta.env.VITE_DEEPSEEK_API_KEY || "").trim();
 
     const savedExportResolution = localStorage.getItem(
       "export.resolution",
@@ -248,6 +253,8 @@ export function initStore() {
     }
 
     syncAiProviderSettings(aiProvider.value, true);
+    void hydrateAiApiKeys();
+    initProjects();
   });
 
   watch(
@@ -273,20 +280,18 @@ export function initStore() {
 
   watch(
     () => aiProvider.value,
-    (v: AiProviderId) => {
+    (v: AiProviderId, prev: AiProviderId | undefined) => {
+      void switchAiProviderKeys(v, prev);
       syncAiProviderSettings(v);
       aiTestMessage.value = "";
       aiTestStatus.value = "";
-      localStorage.setItem("ai.provider", v);
     },
   );
 
   watch(
     () => aiApiKey.value,
-    (v: string) => {
-      const key = v.trim();
-      if (key) localStorage.setItem("ai.apiKey", key);
-      else localStorage.removeItem("ai.apiKey");
+    () => {
+      schedulePersistAiApiKey();
     },
   );
 
