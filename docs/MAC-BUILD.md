@@ -1,27 +1,34 @@
-﻿# macOS build
+# macOS desktop build
 
-Windows cannot run `npm run dist:mac` locally. Use **GitHub Actions** on `macos-latest`.
+## Why not Windows
 
-## CI workflow
+electron-builder cannot produce macOS DMG/ZIP on Windows. Local `npm run dist:mac` must run on macOS.
 
-- Workflow: [`.github/workflows/build-desktop-mac.yml`](../.github/workflows/build-desktop-mac.yml)
-- Actions: https://github.com/maxwellaaa/AuraCard-/actions/workflows/build-desktop-mac.yml
-- Manual run: Actions → **Build Desktop macOS** → **Run workflow**
-- Or: `gh workflow run build-desktop-mac.yml --repo maxwellaaa/AuraCard-`
+## GitHub Actions (recommended)
 
-The job installs dependencies, runs the Vite/Vue build, packages with `electron-builder --mac` (dmg + zip, x64/arm64, unsigned), uploads artifacts, and attaches them to release tag `v1.0.0-2026-08-08` (or the pushed `v*` tag).
+Workflow: [`.github/workflows/build-mac.yml`](../.github/workflows/build-mac.yml)
 
-## Downloads
+- Runner: `macos-latest`
+- Steps: `npm ci` then `npm run dist:mac` (unsigned; `CSC_IDENTITY_AUTO_DISCOVERY=false`)
+- Artifacts: `release/*.dmg` and `release/*.zip` (x64 + arm64 per electron-builder.yml)
+- Triggers: workflow_dispatch (optional release_tag, default v1.0.0-2026-08-08), push to master/main, tags v*
+- On dispatch/tag: attaches assets to the matching GitHub Release when that tag exists
 
-Release assets: https://github.com/maxwellaaa/AuraCard-/releases
+Actions: https://github.com/maxwellaaa/AuraCard-/actions/workflows/build-mac.yml
 
-Look for `*-mac-arm64.dmg` / `*-mac-x64.dmg` (and matching `.zip`).
-
-## Local macOS (optional)
+## Local macOS
 
 ```bash
 npm ci
 npm run dist:mac
 ```
 
-Output: `release/` (see `electron-builder.yml`).
+Output: `release/` (`directories.output` in electron-builder.yml).
+
+## Signing / notarization
+
+CI builds are unsigned (`identity: null`, no Apple Developer cert). Users may need right-click Open. Notarization is not configured.
+
+## Windows packages
+
+Use `npm run dist:win` on Windows; output goes to `E:/cursor-agent/deliverables/AuraCard-desktop-2026-08-08/`.

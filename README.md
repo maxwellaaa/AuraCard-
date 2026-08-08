@@ -6,6 +6,7 @@
 
 - [版本修改说明（Changelog）](CHANGELOG.md)
 - [能力说明](docs/能力说明.md)（英文入口：[FEATURES.md](docs/FEATURES.md)）
+- [macOS desktop build](docs/MAC-BUILD.md) (GitHub Actions workflow: build-mac)
 - 按日变更：[2026-08-08](docs/CHANGELOG-2026-08-08.md) · [2026-08-07](docs/CHANGELOG-2026-08-07.md)
 
 ## 核心能力
