@@ -51,7 +51,7 @@ jobs:
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
           else
-            echo "name=v1.0.0-2026-08-08" >> "$GITHUB_OUTPUT"
+            echo "name=v1.0.1-2026-08-08" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Attach macOS assets to GitHub Release

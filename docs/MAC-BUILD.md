@@ -12,7 +12,7 @@ Workflow: [`.github/workflows/build-mac.yml`](../.github/workflows/build-mac.yml
 - CI uses `--publish never` so electron-builder does not require GH_TOKEN; Release upload is handled by softprops/action-gh-release.
 - Steps: `npm ci` then `npm run dist:mac` (unsigned; `CSC_IDENTITY_AUTO_DISCOVERY=false`)
 - Artifacts: `release/*.dmg` and `release/*.zip` (x64 + arm64 per electron-builder.yml)
-- Triggers: workflow_dispatch (optional release_tag, default v1.0.0-2026-08-08), push to master/main, tags v*
+- Triggers: workflow_dispatch (optional release_tag, default v1.0.1-2026-08-08), push to master/main, tags v*
 - On dispatch/tag: attaches assets to the matching GitHub Release when that tag exists
 
 Actions: https://github.com/maxwellaaa/AuraCard-/actions/workflows/build-mac.yml
@@ -32,4 +32,4 @@ CI builds are unsigned (`identity: null`, no Apple Developer cert). Users may ne
 
 ## Windows packages
 
-Use `npm run dist:win` on Windows; output goes to `E:/cursor-agent/deliverables/AuraCard-desktop-2026-08-08/`.
+Use `npm run dist:win` on Windows; output goes to `E:/cursor-agent/deliverables/AuraCard-desktop-1.0.1/`.
