@@ -10,19 +10,25 @@ const SANITIZE_CONFIG: DOMPurify.Config = {
     'p', 'br', 'hr', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
     'ul', 'ol', 'li', 'pre', 'code', 'blockquote',
     'a', 'strong', 'em', 'del', 's', 'mark', 'sub', 'sup',
-    'table', 'thead', 'tbody', 'tr', 'th', 'td',
+    'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'colgroup', 'col',
     'img', 'span', 'div', 'section', 'del',
   ],
-  ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'target', 'rel', 'width', 'height'],
+  ALLOWED_ATTR: [
+    'href', 'src', 'alt', 'title', 'class', 'target', 'rel',
+    'width', 'height', 'align', 'colspan', 'rowspan', 'scope',
+  ],
   ALLOW_DATA_ATTR: false,
-  FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'style'],
+  FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'],
   FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'textarea', 'button'],
 }
 
-/** 卡片正文：允许 span/p 等带 style，用于选区字号/颜色 */
+/** 卡片正文：允许 span/p/td 等带 style，用于选区字号/颜色与表格对齐 */
 const CARD_HTML_SANITIZE_CONFIG: DOMPurify.Config = {
   ALLOWED_TAGS: SANITIZE_CONFIG.ALLOWED_TAGS,
-  ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'target', 'rel', 'width', 'height', 'style'],
+  ALLOWED_ATTR: [
+    'href', 'src', 'alt', 'title', 'class', 'target', 'rel',
+    'width', 'height', 'align', 'colspan', 'rowspan', 'scope', 'style',
+  ],
   ALLOW_DATA_ATTR: false,
   FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'],
   FORBID_TAGS: SANITIZE_CONFIG.FORBID_TAGS,

@@ -3,6 +3,9 @@ import {
   selectedTemplateId,
   aspectId,
   height,
+  cardScale,
+  clampCardScale,
+  BASE_CARD_HEIGHT,
   title,
   subtitle,
   content,
@@ -40,7 +43,10 @@ export type UserLayoutPreset = {
 export type LayoutSnapshot = {
   selectedTemplateId: TemplateId;
   aspectId: AspectId;
+  /** @deprecated 兼容旧预设；优先用 cardScale */
   height: number;
+  /** 全局卡片缩放，缺省时由 height / BASE_CARD_HEIGHT 推导 */
+  cardScale?: number;
   title: string;
   subtitle: string;
   content: string;
@@ -91,6 +97,7 @@ export function captureLayoutSnapshot(): LayoutSnapshot {
     selectedTemplateId: selectedTemplateId.value,
     aspectId: aspectId.value,
     height: height.value,
+    cardScale: cardScale.value,
     title: title.value,
     subtitle: subtitle.value,
     content: content.value,
@@ -124,7 +131,13 @@ export function applyLayoutSnapshot(snap: LayoutSnapshot) {
   // 先切模板（会触发默认配色 watch），再覆盖为预设快照
   selectedTemplateId.value = snap.selectedTemplateId;
   aspectId.value = snap.aspectId;
-  height.value = snap.height;
+  if (typeof snap.cardScale === "number") {
+    cardScale.value = clampCardScale(snap.cardScale);
+  } else if (typeof snap.height === "number" && snap.height > 0) {
+    cardScale.value = clampCardScale(snap.height / BASE_CARD_HEIGHT);
+  } else {
+    cardScale.value = 1;
+  }
   title.value = snap.title;
   subtitle.value = snap.subtitle;
   content.value = snap.content;

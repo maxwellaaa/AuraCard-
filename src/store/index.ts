@@ -5,7 +5,7 @@ import hljs from "highlight.js";
 import "highlight.js/styles/atom-one-dark.css";
 import {
   aspectId,
-  height,
+  cardScale,
   selectedTemplateId,
   title,
   subtitle,
@@ -67,6 +67,7 @@ export * from "./ai";
 export * from "./sections";
 export * from "./selection";
 export * from "./export";
+export * from "./mdColumns";
 export * from "./fonts";
 export * from "./stickers";
 export * from "./presets";
@@ -74,7 +75,7 @@ export * from "./presets";
 export function resetCardToInitialState() {
   selectedTemplateId.value = "A";
   aspectId.value = "3:4";
-  height.value = 600;
+  cardScale.value = 1;
 
   title.value = "把文字做成光";
   subtitle.value = "可导出 PNG";
@@ -119,7 +120,11 @@ export function initStore() {
       },
     }),
   );
-  marked.use({ breaks: true });
+  // GFM 表格 / 对齐默认开启；breaks 便于换行
+  marked.use({
+    gfm: true,
+    breaks: true,
+  });
 
   initSplit();
   initFonts();
@@ -141,13 +146,7 @@ export function initStore() {
     }
   });
 
-  watch(
-    () => aspectId.value,
-    () => {
-      height.value = 600;
-    },
-    { immediate: true },
-  );
+  // 切换比例时保留 cardScale，仅宽高比变化；重置/预设可改缩放
 
   watch(
     () => selectedTemplateId.value,
@@ -243,8 +242,18 @@ export function initStore() {
       contentTextAlignment.value = savedContentAlign;
     }
 
+    const savedScale = Number(localStorage.getItem("card.cardScale"));
+    if (Number.isFinite(savedScale)) {
+      cardScale.value = Math.min(1.55, Math.max(0.7, Math.round(savedScale * 100) / 100));
+    }
+
     syncAiProviderSettings(aiProvider.value, true);
   });
+
+  watch(
+    () => cardScale.value,
+    (v: number) => localStorage.setItem("card.cardScale", String(v)),
+  );
 
   watch(
     () => exportResolutionId.value,

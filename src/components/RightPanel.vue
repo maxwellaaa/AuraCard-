@@ -224,11 +224,10 @@ watch(chatInput, () => {
               直接排版
             </button>
             <button
-              v-if="m.role === 'assistant'"
               class="btn btn--ghost btn--sm"
               type="button"
               :disabled="isChatLoading"
-              title="让 AI 重新整理成标题/副标题/正文"
+              title="所有 Provider 共用原版整理标准：标题/副标题/正文/水印"
               @click="aiSummarizeMessage(m.content)"
             >
               AI 整理

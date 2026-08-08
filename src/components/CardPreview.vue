@@ -46,6 +46,10 @@ import {
   selectSticker,
   updatePlacedSticker,
   removePlacedSticker,
+  width,
+  setCardWidthPx,
+  previewScale,
+  renderCardMarkdown,
 } from '../store';
 
 const props = defineProps<{
@@ -125,13 +129,22 @@ const displayTitle = computed(() => {
 
 const displaySubtitle = computed(() => {
   if (!showSubtitle.value) return '';
-  if (sectionMode.value) return props.cardSubtitle || '';
+  if (sectionMode.value) return props.cardSubtitle ?? '';
   return props.index === 0 ? subtitle.value : '';
+});
+
+/** 分段模式下始终显示副标题编辑位（即使为空） */
+const showSubtitleBlock = computed(() => {
+  if (!showSubtitle.value) return false;
+  if (sectionMode.value) return true;
+  return props.index === 0;
 });
 
 const showTitleBlock = computed(
   () => sectionMode.value || props.index === 0 || Boolean(displayTitle.value),
 );
+
+const isBodyEmpty = computed(() => !String(props.text || '').trim());
 
 onMounted(() => {
   if (cardRef.value) {
@@ -145,10 +158,7 @@ onBeforeUnmount(() => {
   }
 });
 
-const renderMarkdown = (text: string) => {
-  if (looksLikeHtml(text)) return sanitizeCardHtml(text);
-  return sanitizeCardHtml(String(marked.parse(text || '') || ''));
-};
+const renderMarkdown = (text: string) => renderCardMarkdown(text);
 
 const handleTitleBlur = (e: Event) => {
   clearInlineSelection();
@@ -185,10 +195,7 @@ const startEdit = async (index: number) => {
   await nextTick();
   const el = document.getElementById(`edit-content-${index}`);
   if (!el) return;
-  const raw = props.text || '';
-  el.innerHTML = looksLikeHtml(raw)
-    ? sanitizeCardHtml(raw)
-    : sanitizeCardHtml(String(marked.parse(raw) || ''));
+  el.innerHTML = renderCardMarkdown(props.text || '');
   el.focus();
 };
 
@@ -275,6 +282,28 @@ const onStickerPointerDown = (e: PointerEvent, id: string) => {
   };
   const onUp = () => {
     dragStickerId = null;
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+  };
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+};
+
+const onWidthResizePointerDown = (e: PointerEvent) => {
+  e.stopPropagation();
+  e.preventDefault();
+  selectCard(props.index);
+  selectSticker(null);
+  const startX = e.clientX;
+  const startWidth = width.value;
+  const scale = previewScale.value || 1;
+  (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+
+  const onMove = (ev: PointerEvent) => {
+    const dx = (ev.clientX - startX) / scale;
+    setCardWidthPx(startWidth + dx);
+  };
+  const onUp = () => {
     window.removeEventListener('pointermove', onMove);
     window.removeEventListener('pointerup', onUp);
   };
@@ -378,7 +407,7 @@ export default {
           @blur="handleTitleBlur"
         >{{ displayTitle }}</div>
         <div
-          v-if="displaySubtitle"
+          v-if="showSubtitleBlock"
           class="card__subtitle"
           :style="localSubtitleStyle"
           contenteditable="plaintext-only"
@@ -386,13 +415,14 @@ export default {
           @focus="onSelectCard"
           @blur="handleSubtitleBlur"
         >{{ displaySubtitle }}</div>
-        <div class="card__content-wrapper">
+        <div class="card__content-wrapper" @click="!editingIndex[index] && startEdit(index)">
           <div
             v-if="!editingIndex[index]"
             class="card__content markdown-body"
+            :class="{ 'is-empty-body': isBodyEmpty }"
             :style="localContentStyle"
+            data-placeholder="点击编辑正文，支持 Markdown 表格…"
             v-html="renderMarkdown(text)"
-            @click="startEdit(index)"
           ></div>
           <div
             v-else
@@ -400,13 +430,23 @@ export default {
             class="card__content markdown-body"
             :style="localContentStyle"
             contenteditable="true"
-            data-placeholder="输入正文内容，选中文字后可在左侧单独调字号/颜色…"
+            data-placeholder="输入正文内容，支持 Markdown 表格；选中文字后可在左侧调字号/颜色…"
             @mouseup="trackBodySelection"
             @keyup="trackBodySelection"
+            @click.stop
             @blur="e => finishEdit(index, e)"
           ></div>
         </div>
       </div>
+      <div
+        v-if="!isDownloading"
+        class="card__widthHandle"
+        title="拖动调整全部卡片宽度"
+        aria-label="调整卡片宽度"
+        @pointerdown="onWidthResizePointerDown"
+        @mousedown.stop.prevent
+        @click.stop
+      />
       <div
         class="card__watermark"
         v-if="showWatermark"
@@ -667,14 +707,48 @@ export default {
   white-space: pre-wrap;
   word-break: break-word;
   opacity: 0.96;
-  min-height: 24px;
+  min-height: 48px;
   outline: none;
+  flex: 1;
+  cursor: text;
+}
+
+.card__content.is-empty-body:before {
+  content: attr(data-placeholder);
+  opacity: 0.45;
+  pointer-events: none;
 }
 
 .card__content-wrapper {
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 48px;
+  cursor: text;
+}
+
+.card__widthHandle {
+  position: absolute;
+  top: 12%;
+  right: -5px;
+  width: 10px;
+  height: 76%;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.18);
+  border: 1px solid rgba(37, 99, 235, 0.35);
+  cursor: ew-resize;
+  z-index: 40;
+  touch-action: none;
+  transition: background 0.15s ease;
+}
+
+.card__widthHandle:hover,
+.card__widthHandle:active {
+  background: rgba(37, 99, 235, 0.4);
+}
+
+.is-downloading .card__widthHandle {
+  display: none !important;
 }
 
 :deep(.markdown-body) {
@@ -719,6 +793,80 @@ export default {
   margin-bottom: 12px;
   padding-left: 20px;
 }
+:deep(.markdown-body) table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 12px;
+  font-size: 0.92em;
+  table-layout: fixed;
+  word-break: break-word;
+}
+:deep(.markdown-body) th,
+:deep(.markdown-body) td {
+  border: 1px solid rgba(17, 24, 39, 0.18);
+  padding: 6px 8px;
+  vertical-align: top;
+}
+:deep(.markdown-body) th {
+  font-weight: 700;
+  background: rgba(17, 24, 39, 0.04);
+}
+:deep(.markdown-body) th[align='center'],
+:deep(.markdown-body) td[align='center'] {
+  text-align: center;
+}
+:deep(.markdown-body) th[align='right'],
+:deep(.markdown-body) td[align='right'] {
+  text-align: right;
+}
+:deep(.markdown-body) th[align='left'],
+:deep(.markdown-body) td[align='left'] {
+  text-align: left;
+}
+
+/* 正文分栏：竖排（并排）/ 横排（叠层） */
+:deep(.markdown-body) .md-cols {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 12px;
+  width: 100%;
+}
+:deep(.markdown-body) .md-cols--v.md-cols--n2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+:deep(.markdown-body) .md-cols--v.md-cols--n3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+:deep(.markdown-body) .md-cols--v.md-cols--n4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+:deep(.markdown-body) .md-cols--v.md-cols--n5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+:deep(.markdown-body) .md-cols--v.md-cols--n6 {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+:deep(.markdown-body) .md-cols--h {
+  grid-template-columns: 1fr;
+}
+:deep(.markdown-body) .md-cols__cell {
+  min-width: 0;
+  break-inside: avoid;
+}
+:deep(.markdown-body) .md-cols__cell > *:last-child {
+  margin-bottom: 0;
+}
+:deep(.markdown-body) .md-cols--v .md-cols__cell {
+  padding: 0 4px;
+}
+:deep(.markdown-body) .md-cols--h .md-cols__cell {
+  padding: 8px 0;
+  border-bottom: 1px dashed rgba(17, 24, 39, 0.12);
+}
+:deep(.markdown-body) .md-cols--h .md-cols__cell:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
 
 .card__watermark {
   position: absolute;
@@ -733,10 +881,11 @@ export default {
   opacity: 0.5;
   white-space: pre-wrap;
   word-break: break-word;
-  pointer-events: none;
-  z-index: 1;
+  pointer-events: auto;
+  z-index: 2;
   outline: none;
   min-height: 1em;
+  cursor: text;
 }
 
 .card__stickers {

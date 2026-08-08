@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { MdEditor } from 'md-editor-v3';
+import type { ExposeParam } from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
 import {
   splitContents,
@@ -13,6 +14,7 @@ import {
   isChatLoading,
   isDownloading,
   downloadPng,
+  downloadAllCardsZip,
   resetCardToInitialState,
   sectionMode,
   cardSections,
@@ -25,8 +27,12 @@ import {
   selectedStickerId,
   selectSticker,
   removePlacedSticker,
+  buildColumnFence,
+  clampColCount,
+  COL_COUNT_MIN,
+  COL_COUNT_MAX,
 } from '../store';
-import type { ExportResolutionId } from '../store';
+import type { ColumnDirection, ExportResolutionId } from '../store';
 import CardPreview from './CardPreview.vue';
 
 const isEditingContent = ref(false);
@@ -34,6 +40,8 @@ const useAiSummary = ref(false);
 const mdFileInputRef = ref<HTMLInputElement | null>(null);
 const isDownloadMenuOpen = ref(false);
 const downloadMenuRef = ref<HTMLElement | null>(null);
+const mdEditorRef = ref<ExposeParam>();
+const colCount = ref(2);
 
 const exportResolutionOptions = computed(() =>
   exportResolutionPresets.map((preset) => ({
@@ -66,6 +74,8 @@ const previewCards = computed(() => {
     cardSubtitle: undefined as string | undefined,
   }));
 });
+
+const totalPreviewCards = computed(() => previewCards.value.length);
 
 const triggerMdUpload = () => {
   mdFileInputRef.value?.click();
@@ -116,6 +126,28 @@ const downloadWithResolution = async (id?: ExportResolutionId) => {
   if (id) exportResolutionId.value = id;
   isDownloadMenuOpen.value = false;
   await downloadPng();
+};
+
+const downloadZipAll = async () => {
+  isDownloadMenuOpen.value = false;
+  await downloadAllCardsZip();
+};
+
+const insertColumnBlock = (dir: ColumnDirection) => {
+  const n = clampColCount(colCount.value);
+  colCount.value = n;
+  const block = buildColumnFence(dir, n);
+  const editor = mdEditorRef.value;
+  if (editor?.insert) {
+    editor.insert(() => ({
+      targetValue: block,
+      select: false,
+      deviationStart: 0,
+      deviationEnd: 0,
+    }));
+    return;
+  }
+  content.value = `${content.value || ''}${block}`;
 };
 
 const onDocClick = (e: MouseEvent) => {
@@ -221,7 +253,16 @@ onBeforeUnmount(() => {
               :disabled="isDownloading"
               @click="downloadWithResolution()"
             >
-              按所选分辨率下载
+              逐张下载 PNG
+            </button>
+            <button
+              class="btn btn--outline btn--sm download-menu__confirm"
+              type="button"
+              :disabled="isDownloading"
+              title="将全部页面打包为 ZIP（沿用上方分辨率）"
+              @click="downloadZipAll"
+            >
+              打包下载全部（{{ totalPreviewCards }} 页）
             </button>
           </div>
         </div>
@@ -257,8 +298,39 @@ onBeforeUnmount(() => {
               <button class="btn btn--ghost" @click="isEditingContent = false" :disabled="isChatLoading">✕</button>
             </div>
           </div>
+          <div class="content-editor-colsBar">
+            <span class="content-editor-colsBar__label">正文分栏</span>
+            <label class="content-editor-colsBar__count">
+              数量
+              <select v-model.number="colCount" class="content-editor-colsBar__select">
+                <option v-for="n in COL_COUNT_MAX - COL_COUNT_MIN + 1" :key="n" :value="n + COL_COUNT_MIN - 1">
+                  {{ n + COL_COUNT_MIN - 1 }}
+                </option>
+              </select>
+            </label>
+            <button
+              class="btn btn--outline btn--sm"
+              type="button"
+              :disabled="isChatLoading"
+              title="并排竖向分栏（左右列）"
+              @click="insertColumnBlock('v')"
+            >
+              竖排分栏
+            </button>
+            <button
+              class="btn btn--outline btn--sm"
+              type="button"
+              :disabled="isChatLoading"
+              title="上下横条分栏（叠层行）"
+              @click="insertColumnBlock('h')"
+            >
+              横排分栏
+            </button>
+            <span class="content-editor-colsBar__hint">栏间用 --- 分隔，可改各栏文字</span>
+          </div>
           <div class="content-editor-body">
             <MdEditor
+              ref="mdEditorRef"
               v-model="content"
               :toolbars="['bold', 'underline', 'italic', 'strikeThrough', 'sub', 'sup', 'quote', 'unorderedList', 'orderedList', 'task', '-', 'codeRow', 'code', 'link', 'image', 'table', 'mermaid', 'katex', '-', 'revoke', 'next', '=', 'pageFullscreen', 'fullscreen', 'preview', 'htmlPreview', 'catalog']"
               placeholder="在此输入 Markdown 格式的长文本..."
@@ -266,7 +338,7 @@ onBeforeUnmount(() => {
             />
           </div>
           <div class="content-editor-footer">
-            <span class="content-editor-tip">默认按原文直接排版；勾选后才走 AI 重新整理</span>
+            <span class="content-editor-tip">表格 / 分栏 / 对齐均可；默认按原文排版，勾选后才走 AI 重新整理</span>
             <div class="content-editor-footer__actions">
               <label class="content-editor-summaryToggle">
                 <input type="checkbox" v-model="useAiSummary" :disabled="isChatLoading" class="content-editor-summaryToggle__input" />
@@ -292,6 +364,46 @@ onBeforeUnmount(() => {
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+.content-editor-colsBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(37, 99, 235, 0.03);
+}
+
+.content-editor-colsBar__label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.content-editor-colsBar__count {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.content-editor-colsBar__select {
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-solid, #fff);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.content-editor-colsBar__hint {
+  font-size: 11px;
+  color: var(--muted);
+  margin-left: auto;
 }
 
 .content-editor-body {

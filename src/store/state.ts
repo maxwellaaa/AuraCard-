@@ -17,13 +17,43 @@ export const selectedTemplate = computed(
 );
 
 export const aspectId = ref<AspectId>("3:4");
-export const height = ref(600);
+/** 默认画布高度；实际尺寸 = BASE × cardScale，宽度随比例推导 */
+export const BASE_CARD_HEIGHT = 600;
+export const CARD_SCALE_MIN = 0.7;
+export const CARD_SCALE_MAX = 1.55;
+/** 全局卡片缩放（相对默认宽高），全部页面共用 */
+export const cardScale = ref(1);
+
+export function clampCardScale(v: number) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 1;
+  return Math.min(
+    CARD_SCALE_MAX,
+    Math.max(CARD_SCALE_MIN, Math.round(n * 100) / 100),
+  );
+}
+
+export function setCardScale(v: number) {
+  cardScale.value = clampCardScale(v);
+}
+
 export const activeAspect = computed(
   () => aspectPresets.find((p) => p.id === aspectId.value) ?? aspectPresets[0],
+);
+export const height = computed(() =>
+  Math.round(BASE_CARD_HEIGHT * cardScale.value),
 );
 export const width = computed(() =>
   Math.round((height.value * activeAspect.value.w) / activeAspect.value.h),
 );
+
+/** 按目标宽度调节全局缩放（保持当前比例） */
+export function setCardWidthPx(desiredWidth: number) {
+  const aspect = activeAspect.value;
+  const baseWidth = Math.round((BASE_CARD_HEIGHT * aspect.w) / aspect.h);
+  if (baseWidth <= 0) return;
+  setCardScale(desiredWidth / baseWidth);
+}
 
 export const title = ref("把文字做成光");
 export const subtitle = ref("可导出 PNG");

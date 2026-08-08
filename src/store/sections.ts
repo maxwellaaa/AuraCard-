@@ -391,7 +391,7 @@ export function ensureSectionModeFromCurrent() {
   syncContentFromSections();
 }
 
-/** 手动新增一页空白卡片 */
+/** 手动新增一页可编辑卡片（标题 / 副标题 / 正文均可直接点选编辑） */
 export function addCardPage() {
   ensureSectionModeFromCurrent();
   const nextIndex = cardSections.value.length + 1;

@@ -15,6 +15,7 @@ import {
   contentFontSizePx,
 } from "./state";
 import { resolveContentFontMetrics } from "./styles";
+import { MD_COLS_MEASURE_CSS, preprocessColumnBlocks } from "./mdColumns";
 
 // ---- 1. Markdown 标准化 ----
 
@@ -40,11 +41,22 @@ function normalizeMarkdown(raw: string): string {
 
 // ---- 2. 高度测量 ----
 
+let measureStyleEl: HTMLStyleElement | null = null;
+
+function ensureMeasureColumnStyles() {
+  if (measureStyleEl || typeof document === "undefined") return;
+  measureStyleEl = document.createElement("style");
+  measureStyleEl.setAttribute("data-auracard-md-cols", "1");
+  measureStyleEl.textContent = MD_COLS_MEASURE_CSS;
+  document.head.appendChild(measureStyleEl);
+}
+
 function createMeasureContainer(
   contentWidth: number,
   contentFontSize: number,
   contentLineHeight: number,
 ) {
+  ensureMeasureColumnStyles();
   const el = document.createElement("div");
   el.className = "card__content markdown-body";
   el.style.width = `${contentWidth}px`;
@@ -60,7 +72,8 @@ function createMeasureContainer(
   document.body.appendChild(el);
 
   const measure = (md: string): number => {
-    el.innerHTML = marked.parse(md) as string;
+    const preprocessed = preprocessColumnBlocks(md);
+    el.innerHTML = marked.parse(preprocessed) as string;
     el.querySelectorAll("p").forEach((p) => {
       (p as HTMLElement).style.marginTop = "0";
       (p as HTMLElement).style.marginBottom = "12px";

@@ -13,16 +13,24 @@ import {
   aiTestStatus,
   selectedAiProvider,
   selectedAiModel,
-  title,
-  subtitle,
-  content,
-  watermark,
 } from "./state";
 import { request, RequestError } from "../request";
 import { chatEndpoint, normalizeBaseUrl, newId } from "./utils";
 import type { ChatMessage, AiProviderId } from "./types";
 import { aiProviderOptions } from "./config";
 import { applyTitleSegmentedCards } from "./sections";
+import { runAiOrganize } from "./aiOrganize";
+
+export {
+  CARD_ORGANIZE_SYSTEM_PROMPT,
+  CARD_ORGANIZE_LIMITS,
+  applyOrganizedCardFields,
+  buildOrganizeMessages,
+  localSummarizeToCard,
+  parseCardFromText,
+  runAiOrganize,
+  unwrapOrganizeResponseFence,
+} from "./aiOrganize";
 
 const IMAGE_TERMINAL_FAILURE_STATUS = new Set([
   "FAILED",
@@ -249,7 +257,12 @@ async function callOpenAiCompatibleChat(
     const payload = (await response.json().catch(() => null)) as {
       error?: { message?: string };
       message?: string;
-      choices?: Array<{ message?: { content?: string } }>;
+      choices?: Array<{
+        message?: {
+          content?: string | Array<{ type?: string; text?: string }>;
+          reasoning_content?: string;
+        };
+      }>;
     } | null;
 
     if (!response.ok) {
@@ -260,7 +273,21 @@ async function callOpenAiCompatibleChat(
       throw new RequestError(detail, { status: response.status });
     }
 
-    const text = payload?.choices?.[0]?.message?.content?.trim() || "";
+    const message = payload?.choices?.[0]?.message;
+    const rawContent = message?.content;
+    let text = "";
+    if (typeof rawContent === "string") {
+      text = rawContent.trim();
+    } else if (Array.isArray(rawContent)) {
+      text = rawContent
+        .map((part) => (typeof part?.text === "string" ? part.text : ""))
+        .join("")
+        .trim();
+    }
+    // deepseek-reasoner 等可能把正文放在 reasoning_content
+    if (!text && typeof message?.reasoning_content === "string") {
+      text = message.reasoning_content.trim();
+    }
     if (!text) throw new Error("AI 返回为空。");
     return text;
   } catch (error) {
@@ -382,61 +409,13 @@ export async function testAiConnection() {
   }
 }
 
-export function localSummarizeToCard(raw: string) {
-  const text = raw.trim().replace(/\n{3,}/g, "\n\n");
-  const lines = text
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean);
-  const t = (lines[0] || "一张卡片").slice(0, 24);
-  const sub = (lines[1] || "AI 总结").slice(0, 28);
-  const bodyLines = lines.slice(2);
-  const body = bodyLines.length ? bodyLines.join("\n") : text;
-  title.value = t;
-  subtitle.value = sub;
-  content.value = body;
-  watermark.value = "— AI";
-}
-
-export function parseCardFromText(text: string) {
-  const t = text.match(/标题[:：]\s*(.+)/)?.[1]?.trim();
-  const sub = text.match(/副标题[:：]\s*(.+)/)?.[1]?.trim();
-  const body = text
-    .match(/正文[:：]\s*([\s\S]+?)(?=\n水印[:：]|$)/)?.[1]
-    ?.trim();
-  const wm = text.match(/水印[:：]\s*(.+)/)?.[1]?.trim();
-  return { t, sub, body, wm };
-}
-
+/**
+ * 「AI 整理」：所有 provider（DeepSeek / Qwen / OpenAI / OpenRouter / custom）
+ * 一律经 callAiChat → runAiOrganize（原版 system prompt + parseCardFromText + 字段上限）。
+ * 与「直接排版」(layoutContentAsCards) 分离；成功后退出 sectionMode，交由 split.ts 高度分页。
+ */
 export async function aiSummarizeMessage(rawContent: string) {
-  const source = rawContent.trim();
-  if (!source) return;
-  isChatLoading.value = true;
-  chatError.value = null;
-  try {
-    const { clearSectionMode } = await import("./sections");
-    clearSectionMode();
-    const summary = await callAiChat([
-      {
-        role: "system",
-        content:
-          "你是内容编辑助手。请将用户提供的文字整理成图文内容格式。如果内容较长，请尽量保留原始正文细节，只需生成合适的标题、副标题和水印。输出格式必须为：\n标题：...\n副标题：...\n正文：...\n水印：...",
-      },
-      { role: "user", content: source },
-    ]);
-    const parsed = parseCardFromText(summary);
-    title.value = (parsed.t || title.value).slice(0, 32);
-    subtitle.value = (parsed.sub || subtitle.value).slice(0, 40);
-    // 这里我们不再将长正文进行过度裁剪，保留完整文本交由前面的 splitContents 自动拆分逻辑去处理多卡片
-    content.value = parsed.body || source;
-    watermark.value = (parsed.wm || watermark.value).slice(0, 24);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "整理失败";
-    setChatError(msg);
-    localSummarizeToCard(source);
-  } finally {
-    isChatLoading.value = false;
-  }
+  await runAiOrganize(rawContent, callAiChat);
 }
 
 export async function aiSummarizeLastAssistant() {

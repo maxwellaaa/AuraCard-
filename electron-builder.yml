@@ -4,7 +4,7 @@
   "productName": "光语AuraCard",
   "copyright": "Copyright © AuraCard",
   "directories": {
-    "output": "E:/cursor-agent/deliverables/AuraCard-desktop-2026-08-07",
+    "output": "E:/cursor-agent/deliverables/AuraCard-desktop-2026-08-08",
     "buildResources": "electron/build"
   },
   "files": [
