@@ -12,7 +12,7 @@
     "preview": "vite preview",
     "typecheck": "vue-tsc -p tsconfig.json --noEmit",
     "electron:dev": "npm run build && electron .",
-    "dist:win": "npm run build && electron-builder --win --config electron-builder.yml",
+    "dist:win": "npm run build && electron-builder --win --config electron-builder.yml -c.directories.output=E:/cursor-agent/deliverables/AuraCard-desktop-2026-08-08",
     "dist:mac": "npm run build && electron-builder --mac --config electron-builder.yml",
     "dist:dir": "npm run build && electron-builder --win dir --config electron-builder.yml"
   },
