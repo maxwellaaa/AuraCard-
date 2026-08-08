@@ -29,7 +29,7 @@ jobs:
         run: npm run build
 
       - name: Build macOS packages
-        run: npx electron-builder --mac --config electron-builder.yml
+        run: npx electron-builder --mac --config electron-builder.yml --publish never
         env:
           # Unsigned local/CI build (no Apple Developer identity)
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
