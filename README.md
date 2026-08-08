@@ -2,6 +2,12 @@
 
 **光语**是一款 AI 驱动的内容视觉化平台，覆盖图文卡片、封面设计、AI 图文系列和文章排版四大工作流。
 
+## 文档入口
+
+- [版本修改说明（Changelog）](CHANGELOG.md)
+- [能力说明](docs/能力说明.md)（英文入口：[FEATURES.md](docs/FEATURES.md)）
+- 按日变更：[2026-08-08](docs/CHANGELOG-2026-08-08.md) · [2026-08-07](docs/CHANGELOG-2026-08-07.md)
+
 ## 核心能力
 
 - **图文卡片**：将文字、笔记或聊天内容整理成高质感卡片，支持模板切换与高清导出
@@ -104,8 +110,17 @@ VITE_API_BASE_URL=/api
 - `npm run dist:win`：打包 Windows 安装包 + portable
 - `npm run dist:mac`：打包 macOS（建议在 macOS / CI 执行）
 
-## Release Notes（2026-08-07）
+## Release Notes
+
+### 2026-08-08
+
+本轮重点：Markdown 分栏（竖排/横排）、打包下载全部（ZIP）、AI 整理标准模块、卡片宽度拖拽缩放、贴纸交互加固。
+
+详细说明见 [`docs/CHANGELOG-2026-08-08.md`](docs/CHANGELOG-2026-08-08.md)；汇总见 [`CHANGELOG.md`](CHANGELOG.md)；能力总览见 [`docs/能力说明.md`](docs/能力说明.md)。
+
+### 2026-08-07
 
 本轮重点：选中文字局部字号/颜色/对齐（保留选区、不误伤未选中正文）、封面本地图片导入、在线字体 / 在线贴纸 / 用户预设三入口二级菜单、开源风格贴纸交互（拖动缩放与 Delete/Esc）、Electron 桌面打包。
 
 详细说明见 [`docs/CHANGELOG-2026-08-07.md`](docs/CHANGELOG-2026-08-07.md)。
+
