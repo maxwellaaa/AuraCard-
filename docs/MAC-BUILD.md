@@ -9,6 +9,7 @@ electron-builder cannot produce macOS DMG/ZIP on Windows. Local `npm run dist:ma
 Workflow: [`.github/workflows/build-mac.yml`](../.github/workflows/build-mac.yml)
 
 - Runner: `macos-latest`
+- CI uses `--publish never` so electron-builder does not require GH_TOKEN; Release upload is handled by softprops/action-gh-release.
 - Steps: `npm ci` then `npm run dist:mac` (unsigned; `CSC_IDENTITY_AUTO_DISCOVERY=false`)
 - Artifacts: `release/*.dmg` and `release/*.zip` (x64 + arm64 per electron-builder.yml)
 - Triggers: workflow_dispatch (optional release_tag, default v1.0.0-2026-08-08), push to master/main, tags v*
