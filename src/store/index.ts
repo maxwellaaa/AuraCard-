@@ -254,7 +254,6 @@ export function initStore() {
 
     syncAiProviderSettings(aiProvider.value, true);
     void hydrateAiApiKeys();
-    initProjects();
   });
 
   watch(
