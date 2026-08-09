@@ -120,6 +120,10 @@ export const chatInput = ref("");
 export const isChatLoading = ref(false);
 export const chatError = ref<string | null>(null);
 
+/** AI 整理结果草稿（可编辑后再一键排版） */
+export const aiOrganizeDraft = ref("");
+export const isAiOrganizeDraftOpen = ref(false);
+
 export const aiProvider = ref<AiProviderId>("openrouter");
 export const aiBaseUrl = ref("");
 export const aiApiKey = ref("");

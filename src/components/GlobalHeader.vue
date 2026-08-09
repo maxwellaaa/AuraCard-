@@ -107,10 +107,20 @@ const isImageModelSelected = computed(() =>
                       :placeholder="selectedAiProvider.apiKeyPlaceholder"
                       @blur="persistAiApiKeyNow()"
                     />
-                    <button class="chatConfig__iconBtn" type="button" :title="isAiKeyVisible ? '隐藏 Key' : '显示 Key'" @click="isAiKeyVisible = !isAiKeyVisible">
+                    <button
+                      class="btn btn--ghost chatConfig__iconBtn"
+                      type="button"
+                      :title="isAiKeyVisible ? '隐藏 Key' : '显示 Key'"
+                      @click="isAiKeyVisible = !isAiKeyVisible"
+                    >
                       {{ isAiKeyVisible ? '🙈' : '👁' }}
                     </button>
-                    <button class="chatConfig__testBtn" type="button" :disabled="isTestingAiConnection" @click="testAiConnection">
+                    <button
+                      class="btn btn--primary chatConfig__testBtn"
+                      type="button"
+                      :disabled="isTestingAiConnection"
+                      @click="testAiConnection"
+                    >
                       {{ isTestingAiConnection ? '测试中…' : '测试连接' }}
                     </button>
                   </div>

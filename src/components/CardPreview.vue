@@ -50,6 +50,8 @@ import {
   setCardWidthPx,
   previewScale,
   renderCardMarkdown,
+  trackTableCellSelection,
+  clearTableSelection,
 } from '../store';
 
 const props = defineProps<{
@@ -199,16 +201,22 @@ const startEdit = async (index: number) => {
   el.focus();
 };
 
+const onBodyMouseUp = (index: number, e: MouseEvent) => {
+  trackBodySelection();
+  trackTableCellSelection(index, e.target);
+};
+
 const finishEdit = (index: number, e: Event) => {
   const related = (e as FocusEvent).relatedTarget as HTMLElement | null;
   // 点左侧字号/颜色时不要退出编辑，否则选区样式无法落盘
   if (
     suppressBodyBlur.value ||
-    related?.closest?.('.settings-panel, .fontSizeRow, .colorPickerLight')
+    related?.closest?.('.settings-panel, .fontSizeRow, .colorPickerLight, .tableControls')
   ) {
     return;
   }
   clearInlineSelection();
+  clearTableSelection();
   editingIndex.value[index] = false;
   const el = e.target as HTMLElement;
   const nextBody = sanitizeCardHtml(el.innerHTML || '');
@@ -427,13 +435,13 @@ export default {
           <div
             v-else
             :id="`edit-content-${index}`"
-            class="card__content markdown-body"
+            class="card__content markdown-body is-editing-body"
             :style="localContentStyle"
             contenteditable="true"
-            data-placeholder="输入正文内容，支持 Markdown 表格；选中文字后可在左侧调字号/颜色…"
-            @mouseup="trackBodySelection"
+            data-placeholder="输入正文内容，支持 Markdown 表格；点表格单元格后可在左侧调列对齐/列宽…"
+            @mouseup="onBodyMouseUp(index, $event)"
             @keyup="trackBodySelection"
-            @click.stop
+            @click.stop="trackTableCellSelection(index, $event.target)"
             @blur="e => finishEdit(index, e)"
           ></div>
         </div>
@@ -822,6 +830,15 @@ export default {
 :deep(.markdown-body) th[align='left'],
 :deep(.markdown-body) td[align='left'] {
   text-align: left;
+}
+:deep(.markdown-body.is-editing-body) th,
+:deep(.markdown-body.is-editing-body) td {
+  position: relative;
+}
+:deep(.markdown-body.is-editing-body) th:hover,
+:deep(.markdown-body.is-editing-body) td:hover {
+  outline: 1px dashed rgba(79, 70, 229, 0.45);
+  outline-offset: -1px;
 }
 
 /* 正文分栏：竖排（并排）/ 横排（叠层） */

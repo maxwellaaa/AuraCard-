@@ -74,6 +74,7 @@ export * from "./sections";
 export * from "./selection";
 export * from "./export";
 export * from "./mdColumns";
+export * from "./tables";
 export * from "./fonts";
 export * from "./stickers";
 export * from "./presets";

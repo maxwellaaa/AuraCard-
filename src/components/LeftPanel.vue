@@ -123,6 +123,12 @@ import {
   applyStyleToCurrentSelection,
   persistActiveSelectionField,
   preserveInlineSelection,
+  hasTableSelection,
+  tableSelection,
+  preserveTableSelection,
+  setSelectedColumnAlign,
+  setSelectedColumnWidth,
+  moveSelectedColumn,
   onlineFonts,
   selectedFontId,
   setSelectedFontId,
@@ -673,6 +679,77 @@ const editingContentAlign = computed({
                 }}
               </p>
             </div>
+
+            <div
+              v-if="hasTableSelection"
+              class="field tableControls"
+              style="margin-top: 8px;"
+              @mousedown="preserveTableSelection"
+            >
+              <div class="alignRow__label">
+                表格列 {{ tableSelection.colIndex + 1 }}/{{ tableSelection.colCount }}
+              </div>
+              <div class="segmented segmented--3">
+                <button
+                  type="button"
+                  class="segmented__btn"
+                  :class="{ 'segmented__btn--active': tableSelection.align === 'left' }"
+                  @click="setSelectedColumnAlign('left')"
+                >
+                  左
+                </button>
+                <button
+                  type="button"
+                  class="segmented__btn"
+                  :class="{ 'segmented__btn--active': tableSelection.align === 'center' }"
+                  @click="setSelectedColumnAlign('center')"
+                >
+                  中
+                </button>
+                <button
+                  type="button"
+                  class="segmented__btn"
+                  :class="{ 'segmented__btn--active': tableSelection.align === 'right' }"
+                  @click="setSelectedColumnAlign('right')"
+                >
+                  右
+                </button>
+              </div>
+              <div class="fontSizeRow" style="margin-top: 8px;">
+                <div class="fontSizeRow__head">
+                  <span class="fontSizeRow__label">列宽</span>
+                  <strong class="fontSizeRow__value">{{ tableSelection.widthPercent }}%</strong>
+                </div>
+                <input
+                  class="range"
+                  type="range"
+                  min="10"
+                  max="80"
+                  step="1"
+                  :value="tableSelection.widthPercent"
+                  @input="setSelectedColumnWidth(Number(($event.target as HTMLInputElement).value))"
+                />
+              </div>
+              <div class="presetActionRow" style="margin-top: 6px;">
+                <button
+                  class="btn btn--outline btn--sm"
+                  type="button"
+                  :disabled="tableSelection.colIndex <= 0"
+                  @click="moveSelectedColumn(-1)"
+                >
+                  左移列
+                </button>
+                <button
+                  class="btn btn--outline btn--sm"
+                  type="button"
+                  :disabled="tableSelection.colIndex >= tableSelection.colCount - 1"
+                  @click="moveSelectedColumn(1)"
+                >
+                  右移列
+                </button>
+              </div>
+              <p class="fontSizeRow__tip">在卡片正文编辑态点击表格单元格后调整；导出将保留对齐与列宽。</p>
+            </div>
           </div>
 
           <div class="group">
@@ -724,7 +801,7 @@ const editingContentAlign = computed({
                     {{ f.label }}
                   </option>
                 </select>
-                <div style="display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;">
+                <div class="presetActionRow">
                   <button class="btn btn--outline btn--sm" type="button" :disabled="isUpdatingFonts" @click="onUpdateFonts">
                     {{ isUpdatingFonts ? '更新中…' : '手动更新字体' }}
                   </button>
@@ -732,8 +809,8 @@ const editingContentAlign = computed({
                     添加自定义
                   </button>
                 </div>
-                <p v-if="fontsUpdateMessage" class="fontSizeRow__tip" style="margin-top: 6px;">{{ fontsUpdateMessage }}</p>
-                <div v-if="showCustomFontForm" style="margin-top: 8px; display: grid; gap: 6px;">
+                <p v-if="fontsUpdateMessage" class="fontSizeRow__tip">{{ fontsUpdateMessage }}</p>
+                <div v-if="showCustomFontForm" class="customFontForm">
                   <input v-model="customFontLabel" class="watermark-input" type="text" placeholder="显示名称，如 霞鹜文楷" />
                   <input v-model="customFontFamily" class="watermark-input" type="text" placeholder='CSS family，如 "LXGW WenKai", serif' />
                   <input v-model="customFontCssUrl" class="watermark-input" type="url" placeholder="可选：字体 CSS URL" />
@@ -750,45 +827,47 @@ const editingContentAlign = computed({
               <div class="field">
                 <span class="group__title">保存卡片项目</span>
                 <p class="fontSizeRow__tip">保存完整项目（版式/分页/贴纸等），可本地列表重开或导出 JSON</p>
-                <div style="margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap;">
-                  <input v-model="projectNameInput" class="watermark-input" type="text" placeholder="项目名称" style="flex: 1; min-width: 120px;" />
+                <div class="presetSaveRow">
+                  <input v-model="projectNameInput" class="watermark-input presetSaveRow__input" type="text" placeholder="项目名称" />
                   <button class="btn btn--primary btn--sm" type="button" @click="onSaveProjectLibrary">存到列表</button>
+                </div>
+                <div class="presetActionRow">
                   <button class="btn btn--outline btn--sm" type="button" @click="onExportProject">导出 JSON</button>
                   <button class="btn btn--outline btn--sm" type="button" @click="onPickProjectFile">导入 JSON</button>
                   <button class="btn btn--outline btn--sm" type="button" @click="onExportText">保存文字 MD</button>
-                  <input
-                    ref="projectFileInputRef"
-                    type="file"
-                    accept=".json,application/json,.auracard.json"
-                    style="display: none"
-                    @change="onProjectFileChange"
-                  />
                 </div>
-                <p v-if="projectMessage" class="fontSizeRow__tip" style="margin-top: 6px;">{{ projectMessage }}</p>
+                <input
+                  ref="projectFileInputRef"
+                  class="srOnly"
+                  type="file"
+                  accept=".json,application/json,.auracard.json"
+                  @change="onProjectFileChange"
+                />
+                <p v-if="projectMessage" class="fontSizeRow__tip">{{ projectMessage }}</p>
               </div>
-              <div class="field" style="margin-top: 12px;">
+              <div class="field fieldStack">
                 <span class="group__title">我的项目</span>
                 <div v-if="savedProjects.length" class="presetList">
                   <div v-for="p in savedProjects" :key="p.savedAt" class="presetList__item">
                     <strong class="presetList__name">{{ p.name }}</strong>
                     <div class="presetList__actions">
                       <button class="btn btn--outline btn--sm" type="button" @click="loadProjectFromLibrary(String(p.savedAt))">打开</button>
-                      <button class="btn btn--outline btn--sm" type="button" @click="deleteProjectFromLibrary(p.savedAt)">删除</button>
+                      <button class="btn btn--danger btn--sm" type="button" @click="deleteProjectFromLibrary(p.savedAt)">删除</button>
                     </div>
                   </div>
                 </div>
-                <p v-else class="fontSizeRow__tip" style="margin-top: 8px;">暂无保存的项目</p>
+                <p v-else class="fontSizeRow__tip">暂无保存的项目</p>
               </div>
-              <div class="field" style="margin-top: 12px;">
+              <div class="field fieldStack">
                 <span class="group__title">保存预设</span>
                 <p class="fontSizeRow__tip">仅排版样式快捷复用（模板/配色/字体等）</p>
-                <div style="margin-top: 8px; display: flex; gap: 8px;">
-                  <input v-model="presetNameInput" class="watermark-input" type="text" placeholder="预设名称" style="flex: 1;" />
+                <div class="presetSaveRow">
+                  <input v-model="presetNameInput" class="watermark-input presetSaveRow__input" type="text" placeholder="预设名称" />
                   <button class="btn btn--primary btn--sm" type="button" @click="onSavePreset">保存</button>
                 </div>
-                <p v-if="presetMessage" class="fontSizeRow__tip" style="margin-top: 6px;">{{ presetMessage }}</p>
+                <p v-if="presetMessage" class="fontSizeRow__tip">{{ presetMessage }}</p>
               </div>
-              <div class="field" style="margin-top: 12px;">
+              <div class="field fieldStack">
                 <span class="group__title">我的预设</span>
                 <div v-if="userPresets.length" class="presetList">
                   <div v-for="p in userPresets" :key="p.id" class="presetList__item">
@@ -796,11 +875,11 @@ const editingContentAlign = computed({
                     <div class="presetList__actions">
                       <button class="btn btn--outline btn--sm" type="button" @click="applyPreset(p.id)">应用</button>
                       <button class="btn btn--outline btn--sm" type="button" @click="overwritePreset(p.id)">覆盖更新</button>
-                      <button class="btn btn--outline btn--sm" type="button" @click="deletePreset(p.id)">删除</button>
+                      <button class="btn btn--danger btn--sm" type="button" @click="deletePreset(p.id)">删除</button>
                     </div>
                   </div>
                 </div>
-                <p v-else class="fontSizeRow__tip" style="margin-top: 8px;">暂无预设</p>
+                <p v-else class="fontSizeRow__tip">暂无预设</p>
               </div>
             </template>
           </div>
@@ -812,15 +891,15 @@ const editingContentAlign = computed({
 .extraEntryRow {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
+  gap: var(--space-xs);
 }
 
 .extraEntryRow__btn {
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  background: #fff;
-  color: #334155;
-  border-radius: 10px;
-  padding: 8px 4px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-solid);
+  color: var(--muted);
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm) var(--space-xs);
   font-size: 12px;
   font-weight: 600;
   line-height: 1.2;
@@ -829,14 +908,16 @@ const editingContentAlign = computed({
 }
 
 .extraEntryRow__btn:hover {
-  border-color: rgba(37, 99, 235, 0.35);
-  color: #1d4ed8;
+  border-color: var(--primary-ring);
+  color: var(--primary);
+  background: var(--primary-light);
 }
 
 .extraEntryRow__btn.is-active {
-  background: rgba(37, 99, 235, 0.08);
-  border-color: rgba(37, 99, 235, 0.45);
-  color: #1d4ed8;
+  background: var(--primary-light);
+  border-color: var(--primary-ring);
+  color: var(--primary);
+  font-weight: 700;
 }
 
 .settings-panel {
@@ -849,19 +930,19 @@ const editingContentAlign = computed({
   z-index: 20;
   display: flex;
   flex-direction: column;
-  background: #f8fafc;
+  background: var(--bg0);
   border-radius: inherit;
-  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.04);
+  box-shadow: inset 0 0 0 1px var(--border);
 }
 
 .extraSubmenu__header {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 8px;
-  padding: 12px 14px;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
-  background: #fff;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-solid);
 }
 
 .extraSubmenu__back {
@@ -870,64 +951,93 @@ const editingContentAlign = computed({
   gap: 2px;
   border: none;
   background: transparent;
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
   cursor: pointer;
-  padding: 4px 2px;
+  padding: var(--space-xs) 2px;
 }
 
 .extraSubmenu__back:hover {
-  color: #1d4ed8;
+  color: var(--primary);
 }
 
 .extraSubmenu__title {
   text-align: center;
   font-size: 14px;
-  color: #0f172a;
+  color: var(--text);
 }
 
 .extraSubmenu__close {
   border: none;
   background: transparent;
-  color: #94a3b8;
+  color: var(--muted2);
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
-  padding: 0 4px;
+  padding: 0 var(--space-xs);
 }
 
 .extraSubmenu__close:hover {
-  color: #334155;
+  color: var(--text);
 }
 
 .extraSubmenu__body {
   flex: 1;
   overflow: auto;
-  padding: 14px;
+  padding: var(--space-md);
+}
+
+.fieldStack {
+  margin-top: var(--space-md);
+}
+
+.presetSaveRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.presetSaveRow__input {
+  flex: 1;
+  min-width: 0;
+}
+
+.presetActionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.customFontForm {
+  display: grid;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
 }
 
 .presetList {
   display: grid;
-  gap: 8px;
-  margin-top: 8px;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
 }
 
 .presetList__item {
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  border-radius: 10px;
-  padding: 8px 10px;
-  background: #fff;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--surface-solid);
 }
 
 .presetList__name {
   font-size: 13px;
-  color: #0f172a;
+  color: var(--text);
 }
 
 .presetList__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 6px;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
 }
 </style>

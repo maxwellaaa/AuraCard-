@@ -227,7 +227,7 @@ watch(chatInput, () => {
               class="btn btn--ghost btn--sm"
               type="button"
               :disabled="isChatLoading"
-              title="所有 Provider 共用原版整理标准：标题/副标题/正文/水印"
+              title="AI 整理后进入可编辑草稿，再一键排版"
               @click="aiSummarizeMessage(m.content)"
             >
               AI 整理
@@ -265,7 +265,7 @@ watch(chatInput, () => {
         </div>
         <div class="chatComposer__hint">
           <span v-if="chatInput.trim()">Shift + Enter 换行</span>
-          <span v-else>发送后可「直接排版」，或让 AI 整理</span>
+          <span v-else>发送后可「直接排版」，或 AI 整理 → 编辑草稿 → 一键排版</span>
         </div>
       </div>
     </div>

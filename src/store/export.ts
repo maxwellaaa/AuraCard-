@@ -63,6 +63,19 @@ function collectCardNodes(): HTMLElement[] {
   return [];
 }
 
+/** 规范化页码下标；空/未传则全部页 */
+export function normalizeExportIndices(
+  total: number,
+  indices?: number[] | null,
+) {
+  if (!indices || indices.length === 0) {
+    return Array.from({ length: total }, (_, i) => i);
+  }
+  return [...new Set(indices)]
+    .filter((i) => Number.isInteger(i) && i >= 0 && i < total)
+    .sort((a, b) => a - b);
+}
+
 function resolveExportPreset() {
   return (
     exportResolutionPresets.find((item) => item.id === exportResolutionId.value) ??
@@ -318,28 +331,37 @@ function isAbortError(err: unknown) {
   return err instanceof DOMException && err.name === "AbortError";
 }
 
-/** 逐张下载 PNG（多页时依次触发） */
-export async function downloadPng() {
+/**
+ * 逐张下载 PNG。
+ * @param indices 页码下标（0-based）；省略则全部页
+ */
+export async function downloadPng(indices?: number[] | null) {
   errorMessage.value = null;
   const nodes = collectCardNodes();
   if (nodes.length === 0) {
     notifyError("导出失败：未找到可导出的卡片。");
     return;
   }
+  const idxs = normalizeExportIndices(nodes.length, indices);
+  if (idxs.length === 0) {
+    notifyError("导出失败：未选择任何页面。");
+    return;
+  }
 
   const preset = resolveExportPreset();
-  const generation = beginDownload(nodes.length);
+  const generation = beginDownload(idxs.length);
   await nextTick();
   await yieldToUi();
 
   try {
-    const fontEmbedCSS = await resolveFontEmbedCSS(nodes[0]);
+    const fontEmbedCSS = await resolveFontEmbedCSS(nodes[idxs[0]]);
     assertNotCancelled(generation);
     let savedAnchor: string | undefined;
 
-    for (let i = 0; i < nodes.length; i++) {
+    for (let step = 0; step < idxs.length; step++) {
+      const i = idxs[step];
       assertNotCancelled(generation);
-      downloadProgress.value = { current: i + 1, total: nodes.length };
+      downloadProgress.value = { current: step + 1, total: idxs.length };
       const dataUrl = await renderCardPng(nodes[i], preset, fontEmbedCSS, generation);
       assertNotCancelled(generation);
       const filename = buildPngFilename(i, nodes.length, preset);
@@ -351,14 +373,14 @@ export async function downloadPng() {
       if (result.filePath && !savedAnchor) {
         savedAnchor = result.filePath;
       }
-      if (nodes.length > 1 && !window.auraDesktop) {
+      if (idxs.length > 1 && !window.auraDesktop) {
         await new Promise((r) => setTimeout(r, 400));
       } else {
         await yieldToUi();
       }
     }
     notifySuccess(
-      nodes.length > 1 ? `已导出 ${nodes.length} 张 PNG` : "PNG 已保存",
+      idxs.length > 1 ? `已导出 ${idxs.length} 张 PNG` : "PNG 已保存",
     );
   } catch (err) {
     if (isAbortError(err)) {
@@ -377,29 +399,38 @@ export async function downloadPng() {
   }
 }
 
-/** 一键打包全部卡片为 ZIP（内含各页 PNG，沿用当前导出分辨率） */
-export async function downloadAllCardsZip() {
+/**
+ * 打包所选页面为 ZIP（内含各页 PNG，沿用当前导出分辨率）。
+ * @param indices 页码下标（0-based）；省略则全部页
+ */
+export async function downloadCardsZip(indices?: number[] | null) {
   errorMessage.value = null;
   const nodes = collectCardNodes();
   if (nodes.length === 0) {
     notifyError("导出失败：未找到可导出的卡片。");
     return;
   }
+  const idxs = normalizeExportIndices(nodes.length, indices);
+  if (idxs.length === 0) {
+    notifyError("导出失败：未选择任何页面。");
+    return;
+  }
 
   const preset = resolveExportPreset();
-  const generation = beginDownload(nodes.length);
+  const generation = beginDownload(idxs.length);
   await nextTick();
   await yieldToUi();
 
   try {
     const zip = new JSZip();
     const usedNames = new Map<string, number>();
-    const fontEmbedCSS = await resolveFontEmbedCSS(nodes[0]);
+    const fontEmbedCSS = await resolveFontEmbedCSS(nodes[idxs[0]]);
     assertNotCancelled(generation);
 
-    for (let i = 0; i < nodes.length; i++) {
+    for (let step = 0; step < idxs.length; step++) {
+      const i = idxs[step];
       assertNotCancelled(generation);
-      downloadProgress.value = { current: i + 1, total: nodes.length };
+      downloadProgress.value = { current: step + 1, total: idxs.length };
       const dataUrl = await renderCardPng(nodes[i], preset, fontEmbedCSS, generation);
       assertNotCancelled(generation);
       const baseName = buildPngFilename(i, nodes.length, preset);
@@ -414,19 +445,23 @@ export async function downloadAllCardsZip() {
     }
 
     assertNotCancelled(generation);
-    downloadProgress.value = { current: nodes.length, total: nodes.length };
+    downloadProgress.value = { current: idxs.length, total: idxs.length };
     const blob = await zip.generateAsync({ type: "blob" });
     assertNotCancelled(generation);
     const size = getExportPixelSize(preset);
     const sizeTag = size ? `_${size.w}x${size.h}` : `_x${preset.pixelRatio ?? 2}`;
-    const zipName = `${safeFilename(title.value || "auracard")}_全部${nodes.length}页${sizeTag}.zip`;
+    const pageTag =
+      idxs.length === nodes.length
+        ? `全部${nodes.length}页`
+        : `${idxs.length}页`;
+    const zipName = `${safeFilename(title.value || "auracard")}_${pageTag}${sizeTag}.zip`;
     const buffer = await blob.arrayBuffer();
     const result = await saveArrayBuffer(buffer, zipName);
     if (result.canceled) {
       notifyWarning("已取消保存。");
       return;
     }
-    notifySuccess(`已打包 ${nodes.length} 页为 ZIP`);
+    notifySuccess(`已打包 ${idxs.length} 页为 ZIP`);
   } catch (err) {
     if (isAbortError(err)) {
       return;
@@ -442,4 +477,9 @@ export async function downloadAllCardsZip() {
       clearDownloadState();
     }
   }
+}
+
+/** 一键打包全部卡片为 ZIP */
+export async function downloadAllCardsZip() {
+  return downloadCardsZip();
 }

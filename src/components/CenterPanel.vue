@@ -10,11 +10,11 @@ import {
   previewStageStyle,
   previewWrapperStyle,
   aiSummarizeMessage,
-  layoutContentAsCards,
   isChatLoading,
   isDownloading,
   downloadProgress,
   downloadPng,
+  downloadCardsZip,
   downloadAllCardsZip,
   cancelDownload,
   exportProjectFile,
@@ -28,12 +28,14 @@ import {
   exportResolutionPresets,
   formatExportResolutionLabel,
   activeAspect,
+  activeCardIndex,
   addCardPage,
   selectedStickerId,
   selectSticker,
   removePlacedSticker,
   buildColumnFence,
   clampColCount,
+  insertAlignedMarkdownTableSample,
   COL_COUNT_MIN,
   COL_COUNT_MAX,
 } from '../store';
@@ -47,6 +49,8 @@ const isDownloadMenuOpen = ref(false);
 const downloadMenuRef = ref<HTMLElement | null>(null);
 const mdEditorRef = ref<ExposeParam>();
 const colCount = ref(2);
+const showPagePicker = ref(false);
+const selectedExportPages = ref<number[]>([]);
 
 const exportResolutionOptions = computed(() =>
   exportResolutionPresets.map((preset) => ({
@@ -120,22 +124,71 @@ const resetCard = () => {
 
 const toggleDownloadMenu = () => {
   if (isDownloading.value) return;
-  isDownloadMenuOpen.value = !isDownloadMenuOpen.value;
+  const next = !isDownloadMenuOpen.value;
+  isDownloadMenuOpen.value = next;
+  if (next) {
+    showPagePicker.value = false;
+    selectedExportPages.value = Array.from(
+      { length: totalPreviewCards.value },
+      (_, i) => i,
+    );
+  }
 };
 
 const selectResolution = (id: ExportResolutionId) => {
   exportResolutionId.value = id;
 };
 
-const downloadWithResolution = async (id?: ExportResolutionId) => {
-  if (id) exportResolutionId.value = id;
+const downloadCurrentPage = async () => {
   isDownloadMenuOpen.value = false;
-  await downloadPng();
+  const idx = Math.min(
+    Math.max(0, activeCardIndex.value),
+    Math.max(0, totalPreviewCards.value - 1),
+  );
+  await downloadPng([idx]);
 };
 
 const downloadZipAll = async () => {
   isDownloadMenuOpen.value = false;
   await downloadAllCardsZip();
+};
+
+const toggleExportPage = (index: number) => {
+  const set = new Set(selectedExportPages.value);
+  if (set.has(index)) set.delete(index);
+  else set.add(index);
+  selectedExportPages.value = [...set].sort((a, b) => a - b);
+};
+
+const selectAllExportPages = () => {
+  selectedExportPages.value = Array.from(
+    { length: totalPreviewCards.value },
+    (_, i) => i,
+  );
+};
+
+const downloadSelectedPages = async (mode: 'png' | 'zip') => {
+  const idxs = selectedExportPages.value;
+  if (!idxs.length) return;
+  isDownloadMenuOpen.value = false;
+  showPagePicker.value = false;
+  if (mode === 'zip') await downloadCardsZip(idxs);
+  else await downloadPng(idxs);
+};
+
+const insertAlignedTable = () => {
+  const block = insertAlignedMarkdownTableSample();
+  const editor = mdEditorRef.value;
+  if (editor?.insert) {
+    editor.insert(() => ({
+      targetValue: block,
+      select: false,
+      deviationStart: 0,
+      deviationEnd: 0,
+    }));
+    return;
+  }
+  content.value = `${content.value || ''}${block}`;
 };
 
 const onCancelDownload = () => {
@@ -215,14 +268,14 @@ onBeforeUnmount(() => {
 <template>
   <div class="center-panel-shell">
     <section class="panel center-panel">
-    <div class="content-toolbar">
+    <div class="content-toolbar" role="toolbar" aria-label="卡片内容工具">
       <div class="content-toolbar__group">
-        <button class="btn btn--outline" type="button" @click="isEditingContent = true">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+        <button class="btn btn--outline btn--sm content-toolbar__action" type="button" @click="isEditingContent = true">
+          <svg class="content-toolbar__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
           编辑长内容
         </button>
         <button
-          class="btn btn--outline btn--sm"
+          class="btn btn--outline btn--sm content-toolbar__action"
           type="button"
           :disabled="isChatLoading || isDownloading"
           title="在末尾新增一页可编辑卡片"
@@ -231,7 +284,9 @@ onBeforeUnmount(() => {
           添加页面
         </button>
       </div>
-      <div class="content-toolbar__spacer"></div>
+
+      <span class="content-toolbar__divider" aria-hidden="true"></span>
+
       <div class="content-toolbar__group">
         <button
           class="btn btn--outline btn--sm content-toolbar__action"
@@ -251,13 +306,22 @@ onBeforeUnmount(() => {
         >
           保存项目
         </button>
-        <button class="btn btn--outline btn--sm content-toolbar__action" :disabled="isDownloading || isChatLoading" @click="resetCard">
+        <button
+          class="btn btn--outline btn--sm content-toolbar__action"
+          type="button"
+          :disabled="isDownloading || isChatLoading"
+          @click="resetCard"
+        >
           重置
         </button>
+      </div>
 
+      <span class="content-toolbar__divider" aria-hidden="true"></span>
+
+      <div class="content-toolbar__group content-toolbar__group--download">
         <button
           v-if="isDownloading"
-          class="btn btn--outline btn--sm content-toolbar__action"
+          class="btn btn--danger btn--sm content-toolbar__action"
           type="button"
           title="取消当前打包/下载"
           @click="onCancelDownload"
@@ -299,14 +363,64 @@ onBeforeUnmount(() => {
               <span class="download-menu__itemMain">{{ option.label }}</span>
               <span class="download-menu__itemHint">{{ option.hint }}</span>
             </button>
+
             <button
               class="btn btn--primary btn--sm download-menu__confirm"
               type="button"
-              :disabled="isDownloading"
-              @click="downloadWithResolution()"
+              :disabled="isDownloading || totalPreviewCards < 1"
+              title="仅导出当前选中页"
+              @click="downloadCurrentPage"
             >
-              逐张下载 PNG
+              下载当前页（第 {{ Math.min(activeCardIndex + 1, totalPreviewCards) }} 页）
             </button>
+            <button
+              class="btn btn--outline btn--sm download-menu__confirm"
+              type="button"
+              :disabled="isDownloading || totalPreviewCards < 1"
+              @click="showPagePicker = !showPagePicker"
+            >
+              {{ showPagePicker ? '收起页面选择' : '选择页面下载' }}
+            </button>
+
+            <div v-if="showPagePicker" class="download-menu__pages">
+              <div class="download-menu__pagesHead">
+                <span>选择页面</span>
+                <button class="btn btn--ghost btn--sm" type="button" @click="selectAllExportPages">全选</button>
+              </div>
+              <div class="download-menu__pageGrid">
+                <label
+                  v-for="n in totalPreviewCards"
+                  :key="n"
+                  class="download-menu__pageChip"
+                  :class="{ 'is-active': selectedExportPages.includes(n - 1) }"
+                >
+                  <input
+                    type="checkbox"
+                    class="srOnly"
+                    :checked="selectedExportPages.includes(n - 1)"
+                    @change="toggleExportPage(n - 1)"
+                  />
+                  {{ n }}
+                </label>
+              </div>
+              <button
+                class="btn btn--primary btn--sm download-menu__confirm"
+                type="button"
+                :disabled="isDownloading || !selectedExportPages.length"
+                @click="downloadSelectedPages('png')"
+              >
+                下载所选 PNG（{{ selectedExportPages.length }}）
+              </button>
+              <button
+                class="btn btn--outline btn--sm download-menu__confirm"
+                type="button"
+                :disabled="isDownloading || !selectedExportPages.length"
+                @click="downloadSelectedPages('zip')"
+              >
+                打包所选 ZIP（{{ selectedExportPages.length }}）
+              </button>
+            </div>
+
             <button
               class="btn btn--outline btn--sm download-menu__confirm"
               type="button"
@@ -314,7 +428,7 @@ onBeforeUnmount(() => {
               title="将全部页面打包为 ZIP（沿用上方分辨率）"
               @click="downloadZipAll"
             >
-              打包下载全部（{{ totalPreviewCards }} 页）
+              打包全部（{{ totalPreviewCards }} 页）
             </button>
           </div>
         </div>
@@ -379,7 +493,16 @@ onBeforeUnmount(() => {
             >
               横排分栏
             </button>
-            <span class="content-editor-colsBar__hint">栏间用 --- 分隔，可改各栏文字</span>
+            <button
+              class="btn btn--outline btn--sm"
+              type="button"
+              :disabled="isChatLoading"
+              title="插入带左/中/右对齐的 Markdown 表格"
+              @click="insertAlignedTable"
+            >
+              对齐表格
+            </button>
+            <span class="content-editor-colsBar__hint">表格可用 MD 对齐；卡片内点单元格可调列宽/对齐</span>
           </div>
           <div class="content-editor-body">
             <MdEditor
@@ -411,14 +534,6 @@ onBeforeUnmount(() => {
 <style scoped>
 .center-panel-shell {
   display: contents;
-}
-
-.content-toolbar__error {
-  margin: 0;
-  padding: 0 4px 8px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--danger-text, #b91c1c);
 }
 
 .content-editor-header__actions {
@@ -592,5 +707,53 @@ onBeforeUnmount(() => {
   margin-top: 6px;
   width: 100%;
   justify-content: center;
+}
+
+.download-menu__pages {
+  margin-top: 4px;
+  padding: 8px;
+  border-radius: 8px;
+  background: rgba(37, 99, 235, 0.04);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.download-menu__pagesHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.download-menu__pageGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.download-menu__pageChip {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-solid);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.download-menu__pageChip.is-active {
+  background: var(--primary-light);
+  border-color: var(--primary-ring);
+  color: var(--primary);
 }
 </style>
