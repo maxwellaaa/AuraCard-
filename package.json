@@ -2,7 +2,7 @@
   "name": "auracard",
   "private": true,
   "version": "1.0.3",
-  "description": "光语 AuraCard — AI 图文卡片桌面端",
+  "description": "光语 AuraCard �?AI 图文卡片桌面�?,
   "author": "AuraCard",
   "main": "electron/main.cjs",
   "type": "module",
