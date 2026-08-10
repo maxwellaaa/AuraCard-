@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import { MdEditor } from 'md-editor-v3';
 import type { ExposeParam } from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
@@ -40,6 +40,7 @@ import {
   COL_COUNT_MAX,
 } from '../store';
 import type { ColumnDirection, ExportResolutionId } from '../store';
+import { useSmartPopover } from '../composables/useSmartPopover';
 import CardPreview from './CardPreview.vue';
 
 const isEditingContent = ref(false);
@@ -47,10 +48,28 @@ const useAiSummary = ref(false);
 const mdFileInputRef = ref<HTMLInputElement | null>(null);
 const isDownloadMenuOpen = ref(false);
 const downloadMenuRef = ref<HTMLElement | null>(null);
+const downloadPanelRef = ref<HTMLElement | null>(null);
 const mdEditorRef = ref<ExposeParam>();
 const colCount = ref(2);
 const showPagePicker = ref(false);
 const selectedExportPages = ref<number[]>([]);
+
+const { floatingStyle: downloadMenuStyle, update: updateDownloadMenuPlacement } = useSmartPopover({
+  open: isDownloadMenuOpen,
+  anchorRef: downloadMenuRef,
+  floatingRef: downloadPanelRef,
+  preferredPlacement: 'bottom-end',
+  minWidth: 280,
+  maxWidth: 320,
+  maxHeight: 520,
+  avoidSelectors: ['.settings-panel', '.chat-panel', '.globalHeader'],
+});
+
+watch(showPagePicker, async () => {
+  if (!isDownloadMenuOpen.value) return;
+  await nextTick();
+  updateDownloadMenuPlacement();
+});
 
 const exportResolutionOptions = computed(() =>
   exportResolutionPresets.map((preset) => ({
@@ -223,10 +242,11 @@ const insertColumnBlock = (dir: ColumnDirection) => {
 
 const onDocClick = (e: MouseEvent) => {
   if (!isDownloadMenuOpen.value) return;
-  const el = downloadMenuRef.value;
-  if (el && !el.contains(e.target as Node)) {
-    isDownloadMenuOpen.value = false;
-  }
+  const target = e.target as Node;
+  const anchor = downloadMenuRef.value;
+  const panel = downloadPanelRef.value;
+  if (anchor?.contains(target) || panel?.contains(target)) return;
+  isDownloadMenuOpen.value = false;
 };
 
 function isTypingTarget(el: EventTarget | null) {
@@ -346,91 +366,6 @@ onBeforeUnmount(() => {
             }}
             <span class="download-menu__caret" aria-hidden="true">▾</span>
           </button>
-
-          <div v-if="isDownloadMenuOpen" class="download-menu__panel" @click.stop>
-            <div class="download-menu__head">
-              <div class="download-menu__title">导出分辨率</div>
-              <div class="download-menu__sub">按 {{ activeAspect.id }} 换算 · {{ currentResolutionLabel }}</div>
-            </div>
-            <button
-              v-for="option in exportResolutionOptions"
-              :key="option.id"
-              type="button"
-              class="download-menu__item"
-              :class="{ 'is-active': exportResolutionId === option.id }"
-              @click="selectResolution(option.id)"
-            >
-              <span class="download-menu__itemMain">{{ option.label }}</span>
-              <span class="download-menu__itemHint">{{ option.hint }}</span>
-            </button>
-
-            <button
-              class="btn btn--primary btn--sm download-menu__confirm"
-              type="button"
-              :disabled="isDownloading || totalPreviewCards < 1"
-              title="仅导出当前选中页"
-              @click="downloadCurrentPage"
-            >
-              下载当前页（第 {{ Math.min(activeCardIndex + 1, totalPreviewCards) }} 页）
-            </button>
-            <button
-              class="btn btn--outline btn--sm download-menu__confirm"
-              type="button"
-              :disabled="isDownloading || totalPreviewCards < 1"
-              @click="showPagePicker = !showPagePicker"
-            >
-              {{ showPagePicker ? '收起页面选择' : '选择页面下载' }}
-            </button>
-
-            <div v-if="showPagePicker" class="download-menu__pages">
-              <div class="download-menu__pagesHead">
-                <span>选择页面</span>
-                <button class="btn btn--ghost btn--sm" type="button" @click="selectAllExportPages">全选</button>
-              </div>
-              <div class="download-menu__pageGrid">
-                <label
-                  v-for="n in totalPreviewCards"
-                  :key="n"
-                  class="download-menu__pageChip"
-                  :class="{ 'is-active': selectedExportPages.includes(n - 1) }"
-                >
-                  <input
-                    type="checkbox"
-                    class="srOnly"
-                    :checked="selectedExportPages.includes(n - 1)"
-                    @change="toggleExportPage(n - 1)"
-                  />
-                  {{ n }}
-                </label>
-              </div>
-              <button
-                class="btn btn--primary btn--sm download-menu__confirm"
-                type="button"
-                :disabled="isDownloading || !selectedExportPages.length"
-                @click="downloadSelectedPages('png')"
-              >
-                下载所选 PNG（{{ selectedExportPages.length }}）
-              </button>
-              <button
-                class="btn btn--outline btn--sm download-menu__confirm"
-                type="button"
-                :disabled="isDownloading || !selectedExportPages.length"
-                @click="downloadSelectedPages('zip')"
-              >
-                打包所选 ZIP（{{ selectedExportPages.length }}）
-              </button>
-            </div>
-
-            <button
-              class="btn btn--outline btn--sm download-menu__confirm"
-              type="button"
-              :disabled="isDownloading"
-              title="将全部页面打包为 ZIP（沿用上方分辨率）"
-              @click="downloadZipAll"
-            >
-              打包全部（{{ totalPreviewCards }} 页）
-            </button>
-          </div>
         </div>
       </div>
     </div>
@@ -453,6 +388,100 @@ onBeforeUnmount(() => {
       </div>
     </div>
     </section>
+
+    <Teleport to="body">
+      <div
+        v-if="isDownloadMenuOpen"
+        ref="downloadPanelRef"
+        class="download-menu__panel download-menu__panel--smart"
+        :style="downloadMenuStyle"
+        data-smart-popover="download-card"
+        @click.stop
+      >
+        <div class="download-menu__head">
+          <div class="download-menu__title">导出分辨率</div>
+          <div class="download-menu__sub">按 {{ activeAspect.id }} 换算 · {{ currentResolutionLabel }}</div>
+        </div>
+        <button
+          v-for="option in exportResolutionOptions"
+          :key="option.id"
+          type="button"
+          class="download-menu__item"
+          :class="{ 'is-active': exportResolutionId === option.id }"
+          @click="selectResolution(option.id)"
+        >
+          <span class="download-menu__itemMain">{{ option.label }}</span>
+          <span class="download-menu__itemHint">{{ option.hint }}</span>
+        </button>
+
+        <button
+          class="btn btn--primary btn--sm download-menu__confirm"
+          type="button"
+          :disabled="isDownloading || totalPreviewCards < 1"
+          title="仅导出当前选中页"
+          @click="downloadCurrentPage"
+        >
+          下载当前页（第 {{ Math.min(activeCardIndex + 1, totalPreviewCards) }} 页）
+        </button>
+        <button
+          class="btn btn--outline btn--sm download-menu__confirm"
+          type="button"
+          :disabled="isDownloading || totalPreviewCards < 1"
+          @click="showPagePicker = !showPagePicker"
+        >
+          {{ showPagePicker ? '收起页面选择' : '选择页面下载' }}
+        </button>
+
+        <div v-if="showPagePicker" class="download-menu__pages">
+          <div class="download-menu__pagesHead">
+            <span>选择页面</span>
+            <button class="btn btn--ghost btn--sm" type="button" @click="selectAllExportPages">全选</button>
+          </div>
+          <div class="download-menu__pageGrid">
+            <label
+              v-for="n in totalPreviewCards"
+              :key="n"
+              class="download-menu__pageChip"
+              :class="{ 'is-active': selectedExportPages.includes(n - 1) }"
+            >
+              <input
+                type="checkbox"
+                class="srOnly"
+                :checked="selectedExportPages.includes(n - 1)"
+                @change="toggleExportPage(n - 1)"
+              />
+              {{ n }}
+            </label>
+          </div>
+          <button
+            class="btn btn--primary btn--sm download-menu__confirm"
+            type="button"
+            :disabled="isDownloading || !selectedExportPages.length"
+            @click="downloadSelectedPages('png')"
+          >
+            下载所选 PNG（{{ selectedExportPages.length }}）
+          </button>
+          <button
+            class="btn btn--outline btn--sm download-menu__confirm"
+            type="button"
+            :disabled="isDownloading || !selectedExportPages.length"
+            @click="downloadSelectedPages('zip')"
+          >
+            打包所选 ZIP（{{ selectedExportPages.length }}）
+          </button>
+        </div>
+
+        <button
+          class="btn btn--outline btn--sm download-menu__confirm"
+          type="button"
+          :disabled="isDownloading"
+          title="将全部页面打包为 ZIP（沿用上方分辨率）"
+          @click="downloadZipAll"
+        >
+          打包全部（{{ totalPreviewCards }} 页）
+        </button>
+      </div>
+    </Teleport>
 
     <Teleport to="body">
       <div v-if="isEditingContent" class="content-editor-overlay" @click.self="!isChatLoading && (isEditingContent = false)">
@@ -502,7 +531,7 @@ onBeforeUnmount(() => {
             >
               对齐表格
             </button>
-            <span class="content-editor-colsBar__hint">表格可用 MD 对齐；卡片内点单元格可调列宽/对齐</span>
+            <span class="ui-hint content-editor-colsBar__hint">表格可用 MD 对齐；卡片内点单元格可调列宽/对齐</span>
           </div>
           <div class="content-editor-body">
             <MdEditor
@@ -514,7 +543,7 @@ onBeforeUnmount(() => {
             />
           </div>
           <div class="content-editor-footer">
-            <span class="content-editor-tip">表格 / 分栏 / 对齐均可；默认按原文排版，勾选后才走 AI 重新整理</span>
+            <span class="ui-hint content-editor-tip">表格 / 分栏 / 对齐均可；默认按原文排版，勾选后才走 AI 重新整理</span>
             <div class="content-editor-footer__actions">
               <label class="content-editor-summaryToggle">
                 <input type="checkbox" v-model="useAiSummary" :disabled="isChatLoading" class="content-editor-summaryToggle__input" />
@@ -577,8 +606,6 @@ onBeforeUnmount(() => {
 }
 
 .content-editor-colsBar__hint {
-  font-size: 11px;
-  color: var(--muted);
   margin-left: auto;
 }
 
@@ -635,20 +662,18 @@ onBeforeUnmount(() => {
 }
 
 .download-menu__panel {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 8px);
   width: 280px;
   padding: 10px;
   border-radius: 12px;
   border: 1px solid var(--border);
   background: var(--surface-solid, #fff);
   box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
-  z-index: 40;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  box-sizing: border-box;
 }
+
 
 .download-menu__head {
   padding: 4px 8px 8px;

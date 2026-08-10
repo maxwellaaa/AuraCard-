@@ -151,7 +151,8 @@ import {
   exportContentMarkdown,
   projectMessage,
 } from '../store'
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useSmartPopover } from '../composables/useSmartPopover'
 import UiPanelIntro from './ui/UiPanelIntro.vue'
 import OnlineStickersPanel from './OnlineStickersPanel.vue'
 
@@ -164,12 +165,28 @@ const customFontCssUrl = ref('')
 const showCustomFontForm = ref(false)
 /** 二级菜单：字体 / 贴纸 / 预设 */
 const extraPanel = ref<'fonts' | 'stickers' | 'presets' | null>(null)
+const extraEntryRowRef = ref<HTMLElement | null>(null)
+const extraPanelElRef = ref<HTMLElement | null>(null)
+const isExtraPanelOpen = computed(() => extraPanel.value !== null)
 
 const extraPanelTitle = computed(() => {
   if (extraPanel.value === 'fonts') return '在线字体'
   if (extraPanel.value === 'stickers') return '在线贴纸'
   if (extraPanel.value === 'presets') return '用户预设'
   return ''
+})
+
+const { floatingStyle: extraPanelStyle } = useSmartPopover({
+  open: isExtraPanelOpen,
+  anchorRef: extraEntryRowRef,
+  floatingRef: extraPanelElRef,
+  preferredPlacement: ['right-start', 'right-end', 'bottom-start', 'left-start'],
+  minWidth: 300,
+  maxWidth: 360,
+  maxHeight: 640,
+  offset: 10,
+  // Fly out beside settings; avoid AI rail + header (not the settings panel itself)
+  avoidSelectors: ['.chat-panel', '.globalHeader'],
 })
 
 function openExtraPanel(id: 'fonts' | 'stickers' | 'presets') {
@@ -179,6 +196,16 @@ function openExtraPanel(id: 'fonts' | 'stickers' | 'presets') {
 function closeExtraPanel() {
   extraPanel.value = null
 }
+
+function onExtraPanelDocClick(e: MouseEvent) {
+  if (!extraPanel.value) return
+  const target = e.target as Node
+  if (extraEntryRowRef.value?.contains(target) || extraPanelElRef.value?.contains(target)) return
+  closeExtraPanel()
+}
+
+onMounted(() => document.addEventListener('click', onExtraPanelDocClick))
+onBeforeUnmount(() => document.removeEventListener('click', onExtraPanelDocClick))
 
 async function onUpdateFonts() {
   await updateOnlineFonts()
@@ -340,12 +367,12 @@ const editingContentAlign = computed({
           </div>
 
           <div class="group">
-            <div class="extraEntryRow" role="toolbar" aria-label="扩展工具">
+            <div ref="extraEntryRowRef" class="extraEntryRow" role="toolbar" aria-label="扩展工具">
               <button
                 type="button"
                 class="extraEntryRow__btn"
                 :class="{ 'is-active': extraPanel === 'fonts' }"
-                @click="openExtraPanel('fonts')"
+                @click.stop="openExtraPanel('fonts')"
               >
                 在线字体
               </button>
@@ -353,7 +380,7 @@ const editingContentAlign = computed({
                 type="button"
                 class="extraEntryRow__btn"
                 :class="{ 'is-active': extraPanel === 'stickers' }"
-                @click="openExtraPanel('stickers')"
+                @click.stop="openExtraPanel('stickers')"
               >
                 在线贴纸
               </button>
@@ -361,7 +388,7 @@ const editingContentAlign = computed({
                 type="button"
                 class="extraEntryRow__btn"
                 :class="{ 'is-active': extraPanel === 'presets' }"
-                @click="openExtraPanel('presets')"
+                @click.stop="openExtraPanel('presets')"
               >
                 用户预设
               </button>
@@ -524,7 +551,7 @@ const editingContentAlign = computed({
 
           <div class="group">
             <div class="group__title">文字设置</div>
-            <p class="fontSizeRow__tip" style="margin-top: 6px;">
+            <p class="ui-hint" style="margin-top: 6px;">
               <template v-if="hasInlineSelection">
                 已选中正文文字 — 调整字号/颜色/对齐将<strong>只作用于选区</strong>
               </template>
@@ -591,7 +618,7 @@ const editingContentAlign = computed({
                   <button type="button" class="fontSizeRow__chip" :class="{ 'is-active': editingFontSize === 22 }" @click="editingFontSize = 22">舒适 22</button>
                   <button type="button" class="fontSizeRow__chip" :class="{ 'is-active': editingFontSize === 26 }" @click="editingFontSize = 26">醒目 26</button>
                 </div>
-                <p class="fontSizeRow__tip">
+                <p class="ui-hint">
                   {{ hasInlineSelection ? '当前：仅修改选中文字的字号' : '未选中文字时修改整页正文字号；小红书常用 16–20。' }}
                 </p>
               </div>
@@ -671,7 +698,7 @@ const editingContentAlign = computed({
                   右侧
                 </button>
               </div>
-              <p class="fontSizeRow__tip">
+              <p class="ui-hint">
                 {{
                   hasInlineSelection
                     ? '已选中文字 — 正文对齐/字号/颜色仅作用于选区'
@@ -748,7 +775,7 @@ const editingContentAlign = computed({
                   右移列
                 </button>
               </div>
-              <p class="fontSizeRow__tip">在卡片正文编辑态点击表格单元格后调整；导出将保留对齐与列宽。</p>
+              <p class="ui-hint">在卡片正文编辑态点击表格单元格后调整；导出将保留对齐与列宽。</p>
             </div>
           </div>
 
@@ -777,12 +804,23 @@ const editingContentAlign = computed({
           </div>
         </div>
 
-        <!-- 二级菜单：字体 / 贴纸 / 预设 -->
-        <div v-if="extraPanel" class="extraSubmenu" role="dialog" :aria-label="extraPanelTitle">
+      </aside>
+
+      <Teleport to="body">
+        <div
+          v-if="extraPanel"
+          ref="extraPanelElRef"
+          class="extraSubmenu extraSubmenu--smart"
+          role="dialog"
+          :aria-label="extraPanelTitle"
+          :style="extraPanelStyle"
+          data-smart-popover="extra-panel"
+          @click.stop
+        >
           <div class="extraSubmenu__header">
-            <button type="button" class="extraSubmenu__back" @click="closeExtraPanel" title="返回">
+            <button type="button" class="extraSubmenu__back" @click="closeExtraPanel" title="关闭">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-              返回
+              关闭
             </button>
             <strong class="extraSubmenu__title">{{ extraPanelTitle }}</strong>
             <button type="button" class="extraSubmenu__close" @click="closeExtraPanel" aria-label="关闭">×</button>
@@ -809,7 +847,7 @@ const editingContentAlign = computed({
                     添加自定义
                   </button>
                 </div>
-                <p v-if="fontsUpdateMessage" class="fontSizeRow__tip">{{ fontsUpdateMessage }}</p>
+                <p v-if="fontsUpdateMessage" class="ui-hint">{{ fontsUpdateMessage }}</p>
                 <div v-if="showCustomFontForm" class="customFontForm">
                   <input v-model="customFontLabel" class="watermark-input" type="text" placeholder="显示名称，如 霞鹜文楷" />
                   <input v-model="customFontFamily" class="watermark-input" type="text" placeholder='CSS family，如 "LXGW WenKai", serif' />
@@ -826,7 +864,7 @@ const editingContentAlign = computed({
             <template v-else-if="extraPanel === 'presets'">
               <div class="field">
                 <span class="group__title">保存卡片项目</span>
-                <p class="fontSizeRow__tip">保存完整项目（版式/分页/贴纸等），可本地列表重开或导出 JSON</p>
+                <p class="ui-hint">保存完整项目（版式/分页/贴纸等），可本地列表重开或导出 JSON</p>
                 <div class="presetSaveRow">
                   <input v-model="projectNameInput" class="watermark-input presetSaveRow__input" type="text" placeholder="项目名称" />
                   <button class="btn btn--primary btn--sm" type="button" @click="onSaveProjectLibrary">存到列表</button>
@@ -843,7 +881,7 @@ const editingContentAlign = computed({
                   accept=".json,application/json,.auracard.json"
                   @change="onProjectFileChange"
                 />
-                <p v-if="projectMessage" class="fontSizeRow__tip">{{ projectMessage }}</p>
+                <p v-if="projectMessage" class="ui-hint">{{ projectMessage }}</p>
               </div>
               <div class="field fieldStack">
                 <span class="group__title">我的项目</span>
@@ -856,16 +894,16 @@ const editingContentAlign = computed({
                     </div>
                   </div>
                 </div>
-                <p v-else class="fontSizeRow__tip">暂无保存的项目</p>
+                <p v-else class="ui-hint">暂无保存的项目</p>
               </div>
               <div class="field fieldStack">
                 <span class="group__title">保存预设</span>
-                <p class="fontSizeRow__tip">仅排版样式快捷复用（模板/配色/字体等）</p>
+                <p class="ui-hint">仅排版样式快捷复用（模板/配色/字体等）</p>
                 <div class="presetSaveRow">
                   <input v-model="presetNameInput" class="watermark-input presetSaveRow__input" type="text" placeholder="预设名称" />
                   <button class="btn btn--primary btn--sm" type="button" @click="onSavePreset">保存</button>
                 </div>
-                <p v-if="presetMessage" class="fontSizeRow__tip">{{ presetMessage }}</p>
+                <p v-if="presetMessage" class="ui-hint">{{ presetMessage }}</p>
               </div>
               <div class="field fieldStack">
                 <span class="group__title">我的预设</span>
@@ -879,12 +917,12 @@ const editingContentAlign = computed({
                     </div>
                   </div>
                 </div>
-                <p v-else class="fontSizeRow__tip">暂无预设</p>
+                <p v-else class="ui-hint">暂无预设</p>
               </div>
             </template>
           </div>
         </div>
-      </aside>
+      </Teleport>
 </template>
 
 <style scoped>
@@ -925,15 +963,21 @@ const editingContentAlign = computed({
 }
 
 .extraSubmenu {
-  position: absolute;
-  inset: 0;
-  z-index: 20;
   display: flex;
   flex-direction: column;
-  background: var(--bg0);
-  border-radius: inherit;
-  box-shadow: inset 0 0 0 1px var(--border);
+  background: var(--surface-solid, #fff);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
+  box-sizing: border-box;
+  min-height: 240px;
 }
+
+.extraSubmenu--smart {
+  /* position/size from useSmartPopover (fixed) */
+  inset: auto;
+}
+
 
 .extraSubmenu__header {
   display: grid;

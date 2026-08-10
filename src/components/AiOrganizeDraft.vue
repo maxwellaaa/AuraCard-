@@ -30,7 +30,12 @@ async function onLayout() {
       class="content-editor-overlay"
       @click.self="!isChatLoading && closeAiOrganizeDraft()"
     >
-      <div class="content-editor-modal organize-draft-modal" role="dialog" aria-label="AI 整理结果">
+      <div
+        class="content-editor-modal organize-draft-modal"
+        role="dialog"
+        aria-label="AI 整理结果"
+        data-smart-popover="ai-organize-draft"
+      >
         <div class="content-editor-header">
           <h3 class="content-editor-title">AI 整理结果</h3>
           <div class="content-editor-header__actions">
@@ -42,7 +47,7 @@ async function onLayout() {
             </button>
           </div>
         </div>
-        <p class="organize-draft__tip">可修改标题/副标题/正文/水印，确认后点「一键排版」（不再调用 AI）</p>
+        <p class="ui-hint organize-draft__tip">可修改标题/副标题/正文/水印，确认后点「一键排版」（不再调用 AI）</p>
         <div class="organize-draft__body">
           <textarea
             v-model="aiOrganizeDraft"
@@ -52,7 +57,7 @@ async function onLayout() {
           />
         </div>
         <div class="content-editor-footer">
-          <span class="content-editor-tip">格式：标题：… / 副标题：… / 正文：… / 水印：…</span>
+          <span class="ui-hint content-editor-tip">格式：标题：… / 副标题：… / 正文：… / 水印：…</span>
           <div class="content-editor-footer__actions">
             <button class="btn btn--outline" type="button" :disabled="isChatLoading" @click="closeAiOrganizeDraft">
               稍后处理
@@ -74,16 +79,20 @@ async function onLayout() {
 
 <style scoped>
 .organize-draft-modal {
-  max-width: 720px;
+  max-width: min(720px, calc(100vw - 48px));
+  width: min(720px, 100%);
   height: min(78vh, 720px);
 }
 
+@media (min-width: 980px) {
+  .organize-draft-modal {
+    /* Soft inset so the modal prefers the canvas column over side rails. */
+    max-width: min(720px, calc(100vw - 300px - 320px - 64px));
+  }
+}
+
 .organize-draft__tip {
-  margin: 0;
   padding: 0 var(--space-xl) var(--space-sm);
-  font-size: 12px;
-  color: var(--muted);
-  line-height: 1.5;
 }
 
 .organize-draft__body {

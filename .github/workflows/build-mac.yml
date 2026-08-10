@@ -6,7 +6,7 @@ on:
       release_tag:
         description: GitHub Release tag to attach Mac artifacts (empty to skip)
         required: false
-        default: v1.0.2-2026-08-09
+        default: v1.0.3-2026-08-10
   push:
     branches: [master, main]
     tags: ["v*"]

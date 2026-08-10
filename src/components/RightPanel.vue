@@ -263,7 +263,7 @@ watch(chatInput, () => {
             </svg>
           </button>
         </div>
-        <div class="chatComposer__hint">
+        <div class="ui-hint chatComposer__hint">
           <span v-if="chatInput.trim()">Shift + Enter 换行</span>
           <span v-else>发送后可「直接排版」，或 AI 整理 → 编辑草稿 → 一键排版</span>
         </div>

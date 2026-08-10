@@ -124,10 +124,10 @@ function pathAttrs(item: StickerPackItem) {
         >
           {{ isUpdatingStickers ? '更新中…' : '更新素材清单' }}
         </button>
-        <span class="fontSizeRow__tip">{{ filteredStickerPack.length }} 项</span>
+        <span class="ui-hint">{{ filteredStickerPack.length }} 项</span>
       </div>
-      <p v-if="stickersUpdateMessage" class="fontSizeRow__tip">{{ stickersUpdateMessage }}</p>
-      <p class="fontSizeRow__tip">点击添加 · 选中后可拖动/缩放 · Delete/Backspace 删除 · Esc 取消选中 · 双击删除</p>
+      <p v-if="stickersUpdateMessage" class="ui-hint">{{ stickersUpdateMessage }}</p>
+      <p class="ui-hint">点击添加 · 选中后可拖动/缩放 · Delete/Backspace 删除 · Esc 取消选中 · 双击删除</p>
     </div>
 
     <div v-if="filteredStickerPack.length" class="stickerPanel__grid">
@@ -155,7 +155,7 @@ function pathAttrs(item: StickerPackItem) {
         <span class="stickerPanel__label">{{ item.label }}</span>
       </button>
     </div>
-    <p v-else class="fontSizeRow__tip" style="margin-top: 8px;">未找到相关素材</p>
+    <p v-else class="ui-hint" style="margin-top: 8px;">未找到相关素材</p>
 
     <div v-if="selectedPlacedSticker" class="field stickerPanel__adjust">
       <span class="group__title">选中贴纸</span>

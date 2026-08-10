@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
+import { computed, ref } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
 import {
   aiApiKey,
   aiKeySaveHint,
@@ -19,10 +19,31 @@ import {
   selectedAiProvider,
   testAiConnection,
 } from '../store'
+import { useSmartPopover } from '../composables/useSmartPopover'
+
+const aiSettingsAnchorRef = ref<HTMLElement | null>(null)
+const aiSettingsPanelRef = ref<HTMLElement | null>(null)
+
+const { floatingStyle: aiSettingsStyle } = useSmartPopover({
+  open: isAiSettingsOpen,
+  anchorRef: aiSettingsAnchorRef,
+  floatingRef: aiSettingsPanelRef,
+  preferredPlacement: 'bottom-end',
+  minWidth: 320,
+  maxWidth: 400,
+  maxHeight: 640,
+  offset: 12,
+  zIndex: 90,
+  avoidSelectors: ['.settings-panel', '.chat-panel', '.globalHeader'],
+})
 
 const props = defineProps<{
   compact?: boolean;
 }>();
+
+const route = useRoute()
+/** 非首页显示「返回主页」——图文 / 封面等模式共用同一入口 */
+const showBackHome = computed(() => route.name !== 'home' && route.path !== '/')
 
 const selectedAiModel = computed(() =>
   availableAiModels.value.find((model) => model.value === aiModel.value) ?? null
@@ -38,7 +59,7 @@ const isImageModelSelected = computed(() =>
 <template>
   <header class="globalHeader">
     <div class="globalHeader__inner">
-      <RouterLink to="/" class="brand">
+      <RouterLink to="/" class="brand" title="返回主页" aria-label="返回主页">
         <img src="/logo.png" alt="光语" class="brand__logo" />
         <div>
           <div class="brand__title">光语</div>
@@ -47,127 +68,158 @@ const isImageModelSelected = computed(() =>
       </RouterLink>
       
       <div class="globalHeader__actions">
-        <!-- 默认导航，如果不需要可以通过 slot 覆盖 -->
+        <!-- 默认导航：非首页显示「返回主页」，图文 / 封面等页面共用 -->
         <slot name="nav">
+          <RouterLink
+            v-if="showBackHome"
+            to="/"
+            class="headerBackHome btn btn--outline"
+            title="返回主页"
+            aria-label="返回主页"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M19 12H5" />
+              <path d="M12 19l-7-7 7-7" />
+            </svg>
+            <span class="headerBackHome__label">返回主页</span>
+          </RouterLink>
         </slot>
 
         <!-- AI 设置弹窗：现在在所有页面可用 -->
         <slot name="actions">
-          <div class="chatTop__settings" :class="{ 'is-open': isAiSettingsOpen }">
-            <button class="chatTop__summary btn btn--outline" @click="isAiSettingsOpen = !isAiSettingsOpen">
+          <div
+            ref="aiSettingsAnchorRef"
+            class="chatTop__settings"
+            :class="{ 'is-open': isAiSettingsOpen }"
+          >
+            <button
+              class="chatTop__summary btn btn--outline"
+              type="button"
+              @click.stop="isAiSettingsOpen = !isAiSettingsOpen"
+            >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
               设置
             </button>
-            
-            <!-- 弹出式配置面板 -->
-            <div class="chatTop__drawer" :class="{ 'is-open': isAiSettingsOpen }">
-              <div class="chatConfig">
-                <button class="chatConfig__close" @click="isAiSettingsOpen = false">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                </button>
-                <section class="chatConfig__section">
-                  <div class="chatConfig__head">
-                    <div class="chatConfig__title">API 供应商</div>
-                    <div class="chatConfig__desc">选择内置 AI 服务提供商</div>
-                  </div>
-                  <label class="chatConfig__field">
-                    <div class="chatConfig__selectWrap">
-                      <select v-model="aiProvider" class="chatConfig__control chatConfig__control--select">
-                        <option v-for="provider in aiProviderOptions" :key="provider.id" :value="provider.id">
-                          {{ provider.name }}
-                        </option>
-                      </select>
-                      <span class="chatConfig__caret">⌄</span>
-                    </div>
-                  </label>
-                  <div class="chatConfig__tip">{{ selectedAiProvider.description }}</div>
-                </section>
-
-                <section v-if="isCustomAiProvider" class="chatConfig__section">
-                  <div class="chatConfig__head">
-                    <div class="chatConfig__title">API 地址</div>
-                    <div class="chatConfig__desc">填写兼容 OpenAI Chat Completions 的服务地址</div>
-                  </div>
-                  <label class="chatConfig__field">
-                    <input v-model="customAiBaseUrl" class="chatConfig__control" placeholder="https://api.example.com" />
-                  </label>
-                </section>
-
-                <section class="chatConfig__section">
-                  <div class="chatConfig__head">
-                    <div class="chatConfig__title">API Key</div>
-                    <div class="chatConfig__desc">用于 {{ selectedAiProvider.name }} · 填写后自动保存（各供应商独立）</div>
-                  </div>
-                  <div class="chatConfig__keyRow">
-                    <input
-                      v-model="aiApiKey"
-                      class="chatConfig__control chatConfig__control--key"
-                      :type="isAiKeyVisible ? 'text' : 'password'"
-                      autocomplete="off"
-                      :placeholder="selectedAiProvider.apiKeyPlaceholder"
-                      @blur="persistAiApiKeyNow()"
-                    />
-                    <button
-                      class="btn btn--ghost chatConfig__iconBtn"
-                      type="button"
-                      :title="isAiKeyVisible ? '隐藏 Key' : '显示 Key'"
-                      @click="isAiKeyVisible = !isAiKeyVisible"
-                    >
-                      {{ isAiKeyVisible ? '🙈' : '👁' }}
-                    </button>
-                    <button
-                      class="btn btn--primary chatConfig__testBtn"
-                      type="button"
-                      :disabled="isTestingAiConnection"
-                      @click="testAiConnection"
-                    >
-                      {{ isTestingAiConnection ? '测试中…' : '测试连接' }}
-                    </button>
-                  </div>
-                  <div v-if="aiKeySaveHint" class="chatConfig__feedback chatConfig__feedback--success">
-                    {{ aiKeySaveHint }}
-                  </div>
-                  <div v-if="aiTestMessage" class="chatConfig__feedback" :class="`chatConfig__feedback--${aiTestStatus}`">
-                    {{ aiTestMessage }}
-                  </div>
-                </section>
-
-                <section class="chatConfig__section">
-                  <div class="chatConfig__head">
-                    <div class="chatConfig__title">AI 模型</div>
-                    <div class="chatConfig__desc">选择本次对话使用的模型</div>
-                  </div>
-                  <label v-if="!isCustomAiProvider" class="chatConfig__field">
-                    <div class="chatConfig__selectWrap">
-                      <select v-model="aiModel" class="chatConfig__control chatConfig__control--select">
-                        <option
-                          v-for="model in availableAiModels"
-                          :key="model.value"
-                          :value="model.value"
-                        >
-                          {{ model.label }}
-                        </option>
-                      </select>
-                      <span class="chatConfig__caret">⌄</span>
-                    </div>
-                  </label>
-                  <label v-else class="chatConfig__field">
-                    <input v-model="aiModel" class="chatConfig__control" placeholder="输入模型名称，例如 gpt-4o-mini" />
-                  </label>
-                  <div v-if="isImageModelSelected" class="chatConfig__tip">
-                    当前模型会用于封面 AI 创作与图片模型连接测试，不适用于聊天整理。
-                  </div>
-                </section>
-              </div>
-            </div>
           </div>
         </slot>
       </div>
     </div>
   </header>
-  
-  <!-- 抽屉展开时的遮罩层 -->
-  <div v-if="isAiSettingsOpen" class="chatTop__overlay" @click="isAiSettingsOpen = false"></div>
+
+  <Teleport to="body">
+    <div
+      v-if="isAiSettingsOpen"
+      class="chatTop__overlay chatTop__overlay--smart"
+      @click="isAiSettingsOpen = false"
+    />
+    <div
+      v-if="isAiSettingsOpen"
+      ref="aiSettingsPanelRef"
+      class="chatTop__drawer chatTop__drawer--smart is-open"
+      :style="aiSettingsStyle"
+      data-smart-popover="ai-settings"
+      @click.stop
+    >
+      <div class="chatConfig">
+        <button class="chatConfig__close" type="button" @click="isAiSettingsOpen = false">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+        <section class="chatConfig__section">
+          <div class="chatConfig__head">
+            <div class="chatConfig__title">API 供应商</div>
+            <div class="ui-hint chatConfig__desc">选择内置 AI 服务提供商</div>
+          </div>
+          <label class="chatConfig__field">
+            <div class="chatConfig__selectWrap">
+              <select v-model="aiProvider" class="chatConfig__control chatConfig__control--select">
+                <option v-for="provider in aiProviderOptions" :key="provider.id" :value="provider.id">
+                  {{ provider.name }}
+                </option>
+              </select>
+              <span class="chatConfig__caret">⌄</span>
+            </div>
+          </label>
+          <div class="ui-hint chatConfig__tip">{{ selectedAiProvider.description }}</div>
+        </section>
+
+        <section v-if="isCustomAiProvider" class="chatConfig__section">
+          <div class="chatConfig__head">
+            <div class="chatConfig__title">API 地址</div>
+            <div class="ui-hint chatConfig__desc">填写兼容 OpenAI Chat Completions 的服务地址</div>
+          </div>
+          <label class="chatConfig__field">
+            <input v-model="customAiBaseUrl" class="chatConfig__control" placeholder="https://api.example.com" />
+          </label>
+        </section>
+
+        <section class="chatConfig__section">
+          <div class="chatConfig__head">
+            <div class="chatConfig__title">API Key</div>
+            <div class="ui-hint chatConfig__desc">用于 {{ selectedAiProvider.name }} · 填写后自动保存（各供应商独立）</div>
+          </div>
+          <div class="chatConfig__keyRow">
+            <input
+              v-model="aiApiKey"
+              class="chatConfig__control chatConfig__control--key"
+              :type="isAiKeyVisible ? 'text' : 'password'"
+              autocomplete="off"
+              :placeholder="selectedAiProvider.apiKeyPlaceholder"
+              @blur="persistAiApiKeyNow()"
+            />
+            <button
+              class="btn btn--ghost chatConfig__iconBtn"
+              type="button"
+              :title="isAiKeyVisible ? '隐藏 Key' : '显示 Key'"
+              @click="isAiKeyVisible = !isAiKeyVisible"
+            >
+              {{ isAiKeyVisible ? '🙈' : '👁' }}
+            </button>
+            <button
+              class="btn btn--primary chatConfig__testBtn"
+              type="button"
+              :disabled="isTestingAiConnection"
+              @click="testAiConnection"
+            >
+              {{ isTestingAiConnection ? '测试中…' : '测试连接' }}
+            </button>
+          </div>
+          <div v-if="aiKeySaveHint" class="chatConfig__feedback chatConfig__feedback--success">
+            {{ aiKeySaveHint }}
+          </div>
+          <div v-if="aiTestMessage" class="chatConfig__feedback" :class="`chatConfig__feedback--${aiTestStatus}`">
+            {{ aiTestMessage }}
+          </div>
+        </section>
+
+        <section class="chatConfig__section">
+          <div class="chatConfig__head">
+            <div class="chatConfig__title">AI 模型</div>
+            <div class="ui-hint chatConfig__desc">选择本次对话使用的模型</div>
+          </div>
+          <label v-if="!isCustomAiProvider" class="chatConfig__field">
+            <div class="chatConfig__selectWrap">
+              <select v-model="aiModel" class="chatConfig__control chatConfig__control--select">
+                <option
+                  v-for="model in availableAiModels"
+                  :key="model.value"
+                  :value="model.value"
+                >
+                  {{ model.label }}
+                </option>
+              </select>
+              <span class="chatConfig__caret">⌄</span>
+            </div>
+          </label>
+          <label v-else class="chatConfig__field">
+            <input v-model="aiModel" class="chatConfig__control" placeholder="输入模型名称，例如 gpt-4o-mini" />
+          </label>
+          <div v-if="isImageModelSelected" class="ui-hint chatConfig__tip">
+            当前模型会用于封面 AI 创作与图片模型连接测试，不适用于聊天整理。
+          </div>
+        </section>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -237,6 +289,15 @@ const isImageModelSelected = computed(() =>
   gap: var(--space-lg);
 }
 
+.headerBackHome {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
 @media (max-width: 767px) {
   .globalHeader {
     height: 52px;
@@ -264,6 +325,11 @@ const isImageModelSelected = computed(() =>
 
   .globalHeader__actions {
     gap: var(--space-sm);
+  }
+
+  .headerBackHome {
+    font-size: 12px;
+    padding: 6px 10px;
   }
 
   /* 移动端 AI 设置按钮缩小 */

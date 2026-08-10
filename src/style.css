@@ -334,11 +334,19 @@ button:disabled {
   background: rgba(37, 99, 235, 0.08);
   color: var(--primary);
 }
-.fontSizeRow__tip {
+/* Shared explanatory / helper text (left tips, chat hint, watermark notes, etc.) */
+.ui-hint,
+.fontSizeRow__tip,
+.chatComposer__hint,
+.organize-draft__tip,
+.content-editor-colsBar__hint,
+.content-editor-tip,
+.chatConfig__tip,
+.chatConfig__desc {
   margin: 0;
   font-size: 11px;
   line-height: 1.5;
-  color: var(--muted2, #94a3b8);
+  color: var(--muted2);
 }
 
 .alignRow__label {
